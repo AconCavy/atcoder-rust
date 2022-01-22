@@ -1,0 +1,33 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+charset = utf-8
+indent_style = space
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Shell script files
+[*.sh]
+end_of_line = lf
+indent_size = 2
+
+[*.cmd]
+end_of_line = crlf
+indent_size = 2
+
+# Markdown files
+[*.md]
+insert_final_newline = true
+trim_trailing_whitespace = false
+
+# JSON files
+[*.json]
+indent_size = 2
+
+[*.rs]
+indent_size = 4
