@@ -8,11 +8,13 @@ fn main() {
         a: [i64; n],
     }
 
-    let ave = |k: i64, a: &Vec<i64>| -> bool {
+    let f = |k: i64, a: &[i64]| -> bool {
         return dp(a.into_iter().map(|x| x * 1000 - k).collect()) >= 0;
     };
+    let ave = binary_search(1e12 as i64 + 1, 0, &a, f) as f64 / 1000.0;
+    println!("{}", ave);
 
-    let med = |k: i64, a: &Vec<i64>| -> bool {
+    let f = |k: i64, a: &[i64]| -> bool {
         return dp(a
             .into_iter()
             .map(|x| if *x >= k { 1 } else { -1 })
@@ -20,9 +22,8 @@ fn main() {
             > 0;
     };
 
-    let ave = binary_search((1e12 as i64) + 1, 0, &a, ave) as f64 / 1000.0;
-    let med = binary_search((1e9 as i64) + 1, 0, &a, med);
-    println!("{}\n{}", ave, med);
+    let med = binary_search(1e9 as i64 + 1, 0, &a, f);
+    println!("{}", med);
 }
 
 fn dp(source: Vec<i64>) -> i64 {
@@ -37,7 +38,7 @@ fn dp(source: Vec<i64>) -> i64 {
     return std::cmp::max(x, y);
 }
 
-fn binary_search(ng: i64, ok: i64, a: &Vec<i64>, f: fn(i64, &Vec<i64>) -> bool) -> i64 {
+fn binary_search(ng: i64, ok: i64, a: &[i64], f: fn(i64, &[i64]) -> bool) -> i64 {
     let mut ng = ng;
     let mut ok = ok;
     while abs(ng - ok) > 1 {
