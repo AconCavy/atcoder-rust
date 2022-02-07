@@ -1,5 +1,5 @@
 [workspace]
 
 members = [
-    "mylib"
+    "abc/abc224"
 ]
