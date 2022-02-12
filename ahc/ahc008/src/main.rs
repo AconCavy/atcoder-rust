@@ -8,7 +8,6 @@ use itertools::Itertools;
 use proconio::marker::Chars;
 use proconio::source::line::LineSource;
 use proconio::*;
-use rand::{thread_rng, Rng};
 
 const MAP_SIZE: usize = 30 + 2;
 const INVALID: i32 = -1;
@@ -59,19 +58,47 @@ fn main() {
         blocks[i][MAP_SIZE - 1] = true;
     }
 
+    for i in 0..m {
+        let mut d = 1e9 as i32;
+        for j in 0..n {
+            d = d.min(
+                (&pets[j].position.x - &humans[i].position.x).abs()
+                    + (&pets[j].position.y - &humans[i].position.y).abs(),
+            );
+        }
+
+        let x1 = (&humans[i].position.x - d).max(1).min(30);
+        let y1 = (&humans[i].position.y - d).max(1).min(30);
+        let x2 = (&humans[i].position.x + d).max(1).min(30);
+        let y2 = (&humans[i].position.y + d).max(1).min(30);
+        humans[i].area = Area::new(x1, y1, x2, y2);
+    }
+
+    for i in 0..m {
+        let mut area = humans[i].area.clone();
+        for j in 0..m {
+            if area.intersect(&humans[j].area) {
+                area = area.combine(&humans[j].area);
+            }
+        }
+
+        humans[i].area = area;
+    }
+
     for _ in 0..300 {
-        let mut exists = vec![vec![false; MAP_SIZE]; MAP_SIZE];
+        let mut human_exists = vec![vec![false; MAP_SIZE]; MAP_SIZE];
+        let mut pet_exists = vec![vec![false; MAP_SIZE]; MAP_SIZE];
         for pos in humans.iter().map(|x| x.position) {
-            exists[pos.x as usize][pos.y as usize] = true;
+            human_exists[pos.x as usize][pos.y as usize] = true;
         }
 
         for pos in pets.iter().map(|x| x.position) {
-            exists[pos.x as usize][pos.y as usize] = true;
+            pet_exists[pos.x as usize][pos.y as usize] = true;
         }
 
         let mut answer = vec!['.'; m];
         for i in 0..m {
-            answer[i] = humans[i].act(&pets, &exists, &mut blocks);
+            answer[i] = humans[i].act(&human_exists, &pet_exists, &mut blocks);
         }
 
         println!("{}", answer.into_iter().join(""));
@@ -118,6 +145,33 @@ fn calc_steps(blocks: &[Vec<bool>], (sx, sy): (i32, i32)) -> (Vec<Vec<i32>>, Vec
     (steps, steps_from)
 }
 
+fn calc_distance(blocks: &[Vec<bool>], pets: &[Pet]) -> Vec<Vec<i32>> {
+    let mut distance = vec![vec![INVALID; MAP_SIZE]; MAP_SIZE];
+    let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
+    for pos in pets.iter().map(|x| x.position) {
+        distance[pos.x as usize][pos.y as usize] = 0;
+        queue.push_back((pos.x, pos.y));
+    }
+
+    while let Some((cx, cy)) = queue.pop_front() {
+        for (dx, dy) in Direction::DIRECTION4.iter().map(|x| x.to_tuple()) {
+            if cx + dx < 0 || cy + dy < 0 {
+                continue;
+            }
+            let nx = (cx + dx) as usize;
+            let ny = (cy + dy) as usize;
+            if MAP_SIZE <= nx || MAP_SIZE <= ny || blocks[nx][ny] || distance[nx][ny] != INVALID {
+                continue;
+            }
+
+            distance[nx][ny] = distance[cx as usize][cy as usize] + 1;
+            queue.push_back((nx as i32, ny as i32));
+        }
+    }
+
+    distance
+}
+
 #[derive(Debug, Eq, PartialEq)]
 enum Direction {
     None,
@@ -135,7 +189,7 @@ impl Direction {
         Direction::Right,
     ];
 
-    fn inv(&self) -> Direction {
+    fn inverse(&self) -> Direction {
         match self {
             Direction::None => Direction::None,
             Direction::Up => Direction::Down,
@@ -207,7 +261,7 @@ impl Vector {
         self.translate(x, y);
     }
 
-    fn neighbor(&self, dir: &Direction) -> Self {
+    fn neighbor(&self, dir: &Direction) -> Vector {
         let (x, y) = dir.to_tuple();
         Self {
             x: self.x + x,
@@ -242,79 +296,265 @@ impl Pet {
 #[derive(Debug, Clone)]
 struct Human {
     position: Vector,
+    area: Area,
 }
 
 impl Human {
     fn new(x: i32, y: i32) -> Self {
         Self {
             position: Vector { x, y },
+            area: Area::new(0, 0, MAP_SIZE as i32, MAP_SIZE as i32),
         }
     }
 
-    fn act(&mut self, pets: &[Pet], exists: &[Vec<bool>], blocks: &mut [Vec<bool>]) -> char {
-        let (steps, steps_from) = calc_steps(blocks, (self.position.x, self.position.y));
+    fn act(
+        &mut self,
+        human_exists: &[Vec<bool>],
+        pet_exists: &[Vec<bool>],
+        blocks: &mut [Vec<bool>],
+    ) -> char {
+        if self.is_up_limit() {
+            // UL
+            if self.is_left_limit() {
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
+                if result != '.' {
+                    return result;
+                }
 
-        let mut target_step = 1e9 as i32;
-        let mut target = INVALID;
-        for (i, pet) in pets.iter().enumerate() {
-            let step = steps[pet.position.x as usize][pet.position.y as usize];
-            if step == INVALID {
-                continue;
-            }
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
+                if result != '.' {
+                    return result;
+                }
 
-            if step < target_step {
-                target_step = step;
-                target = i as i32;
-            }
-        }
-
-        if target == INVALID {
-            return '.';
-        }
-
-        let target = &pets[target as usize];
-        let mut cx = target.position.x;
-        let mut cy = target.position.y;
-        loop {
-            if steps_from[cx as usize][cy as usize] == (INVALID, INVALID) {
-                break;
-            }
-
-            let tmp = steps_from[cx as usize][cy as usize];
-            cx = tmp.0;
-            cy = tmp.1;
-        }
-
-        let direction = Direction::from_tuple((cx - self.position.x, cy - self.position.y));
-
-        if target_step < 3 {
-            let direction = direction.inv();
-            self.position.translate_by_direction(&direction);
-            return direction.to_char();
-        } else if 3 <= target_step && target_step < 6 {
-            if !exists[cx as usize][cy as usize] {
-                blocks[cx as usize][cy as usize] = true;
-                return direction.to_char().to_ascii_lowercase();
-            } else {
-                loop {
-                    let direction = match thread_rng().gen_range(0, 5) {
-                        0 => Direction::Up,
-                        1 => Direction::Down,
-                        2 => Direction::Left,
-                        3 => Direction::Right,
-                        _ => Direction::None,
-                    };
-
-                    let neighbor = self.position.neighbor(&direction);
-                    if neighbor.is_valid() && !blocks[neighbor.x as usize][neighbor.y as usize] {
-                        self.position.translate_by_direction(&direction);
-                        return direction.to_char();
-                    }
+                let result = self.move_or_stay(blocks, &Direction::Right);
+                if result != '.' {
+                    return result;
                 }
             }
-        } else {
-            self.position.translate_by_direction(&direction);
-            return direction.to_char();
+
+            // UR
+            if self.is_right_limit() {
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
+                if result != '.' {
+                    return result;
+                }
+
+                let result =
+                    self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
+                if result != '.' {
+                    return result;
+                }
+
+                let result = self.move_or_stay(blocks, &Direction::Down);
+                if result != '.' {
+                    return result;
+                }
+            }
         }
+
+        if self.is_down_limit() {
+            // DR
+            if self.is_right_limit() {
+                let result =
+                    self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
+                if result != '.' {
+                    return result;
+                }
+
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
+                if result != '.' {
+                    return result;
+                }
+
+                let result = self.move_or_stay(blocks, &Direction::Left);
+                if result != '.' {
+                    return result;
+                }
+            }
+
+            // DL
+            if self.is_left_limit() {
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
+                if result != '.' {
+                    return result;
+                }
+
+                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
+                if result != '.' {
+                    return result;
+                }
+
+                let result = self.move_or_stay(blocks, &Direction::Up);
+                if result != '.' {
+                    return result;
+                }
+            }
+        }
+
+        // U
+        if self.is_up_limit() {
+            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
+            if result != '.' {
+                return result;
+            }
+
+            let result = self.move_or_stay(blocks, &Direction::Right);
+            if result != '.' {
+                return result;
+            }
+        }
+
+        // R
+        if self.is_right_limit() {
+            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
+            if result != '.' {
+                return result;
+            }
+
+            let result = self.move_or_stay(blocks, &Direction::Down);
+            if result != '.' {
+                return result;
+            }
+        }
+
+        // D
+        if self.is_down_limit() {
+            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
+            if result != '.' {
+                return result;
+            }
+
+            let result = self.move_or_stay(blocks, &Direction::Left);
+            if result != '.' {
+                return result;
+            }
+        }
+
+        // L
+        if self.is_left_limit() {
+            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
+            if result != '.' {
+                return result;
+            }
+
+            let result = self.move_or_stay(blocks, &Direction::Up);
+            if result != '.' {
+                return result;
+            }
+        }
+
+        self.move_or_stay(blocks, &Direction::Up)
+    }
+
+    fn move_or_stay(&mut self, blocks: &mut [Vec<bool>], direction: &Direction) -> char {
+        let p = self.position.neighbor(&direction);
+        return if !blocks[p.x as usize][p.y as usize] {
+            self.position = p;
+            direction.to_char()
+        } else {
+            '.'
+        };
+    }
+
+    fn block_or_stay(
+        &self,
+        human_exists: &[Vec<bool>],
+        pet_exists: &[Vec<bool>],
+        blocks: &mut [Vec<bool>],
+        direction: &Direction,
+    ) -> char {
+        let is_blockable =
+            |human_exists: &[Vec<bool>], pet_exists: &[Vec<bool>], position: &Vector| -> bool {
+                if human_exists[position.x as usize][position.y as usize]
+                    || pet_exists[position.x as usize][position.y as usize]
+                {
+                    return false;
+                }
+
+                for dir in &Direction::DIRECTION4 {
+                    let p = position.neighbor(&dir);
+                    if p.is_valid() && pet_exists[p.x as usize][p.y as usize] {
+                        return false;
+                    }
+                }
+
+                true
+            };
+
+        let p = self.position.neighbor(&direction);
+        return if !blocks[p.x as usize][p.y as usize] && is_blockable(human_exists, pet_exists, &p)
+        {
+            blocks[p.x as usize][p.y as usize] = true;
+            direction.to_char().to_ascii_lowercase()
+        } else {
+            '.'
+        };
+    }
+
+    fn is_up_limit(&self) -> bool {
+        self.area.is_up_edge(&self.position)
+    }
+
+    fn is_down_limit(&self) -> bool {
+        self.area.is_down_edge(&self.position)
+    }
+
+    fn is_left_limit(&self) -> bool {
+        self.area.is_left_edge(&self.position)
+    }
+
+    fn is_right_limit(&self) -> bool {
+        self.area.is_right_edge(&self.position)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Area {
+    position1: Vector,
+    position2: Vector,
+}
+
+impl Area {
+    fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
+        Self {
+            position1: Vector { x: x1, y: y1 },
+            position2: Vector { x: x2, y: y2 },
+        }
+    }
+
+    fn combine(&self, other: &Area) -> Self {
+        Self {
+            position1: Vector {
+                x: self.position1.x.min(other.position1.x),
+                y: self.position1.y.min(other.position1.y),
+            },
+            position2: Vector {
+                x: self.position2.x.max(other.position2.x),
+                y: self.position2.y.max(other.position2.y),
+            },
+        }
+    }
+
+    fn intersect(&self, other: &Area) -> bool {
+        self.position1.x <= other.position2.x
+            && other.position1.x <= self.position2.x
+            && self.position1.y <= other.position2.y
+            && other.position1.y <= self.position2.y
+    }
+
+    fn is_up_edge(&self, position: &Vector) -> bool {
+        position.x == self.position1.x
+    }
+
+    fn is_down_edge(&self, position: &Vector) -> bool {
+        position.x == self.position2.x
+    }
+
+    fn is_left_edge(&self, position: &Vector) -> bool {
+        position.y == self.position1.y
+    }
+
+    fn is_right_edge(&self, position: &Vector) -> bool {
+        position.y == self.position2.y
     }
 }
