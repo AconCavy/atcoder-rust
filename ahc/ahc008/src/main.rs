@@ -10,7 +10,6 @@ use proconio::source::line::LineSource;
 use proconio::*;
 
 const MAP_SIZE: usize = 30 + 2;
-const INVALID: i32 = -1;
 
 fn main() {
     let stdin = io::stdin();
@@ -49,14 +48,8 @@ fn main() {
         humans.push(Human::new(hx, hy));
     }
 
-    let mut blocks = vec![vec![false; MAP_SIZE]; MAP_SIZE];
-
-    for i in 0..MAP_SIZE {
-        blocks[0][i] = true;
-        blocks[MAP_SIZE - 1][i] = true;
-        blocks[i][0] = true;
-        blocks[i][MAP_SIZE - 1] = true;
-    }
+    let mut grid = Grid::new(MAP_SIZE);
+    grid.init();
 
     for i in 0..m {
         let mut d = 1e9 as i32;
@@ -86,19 +79,12 @@ fn main() {
     }
 
     for _ in 0..300 {
-        let mut human_exists = vec![vec![false; MAP_SIZE]; MAP_SIZE];
-        let mut pet_exists = vec![vec![false; MAP_SIZE]; MAP_SIZE];
-        for pos in humans.iter().map(|x| x.position) {
-            human_exists[pos.x as usize][pos.y as usize] = true;
-        }
-
-        for pos in pets.iter().map(|x| x.position) {
-            pet_exists[pos.x as usize][pos.y as usize] = true;
-        }
+        grid.update_human_exists(&humans);
+        grid.update_pet_exists(&pets);
 
         let mut answer = vec!['.'; m];
         for i in 0..m {
-            answer[i] = humans[i].act(&human_exists, &pet_exists, &mut blocks);
+            answer[i] = humans[i].act(&mut grid);
         }
 
         println!("{}", answer.into_iter().join(""));
@@ -117,59 +103,6 @@ fn main() {
             );
         }
     }
-}
-
-fn calc_steps(blocks: &[Vec<bool>], (sx, sy): (i32, i32)) -> (Vec<Vec<i32>>, Vec<Vec<(i32, i32)>>) {
-    let mut steps = vec![vec![INVALID; MAP_SIZE]; MAP_SIZE];
-    let mut steps_from = vec![vec![(INVALID, INVALID); MAP_SIZE]; MAP_SIZE];
-    let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
-    queue.push_back((sx, sy));
-    steps[sx as usize][sy as usize] = 0;
-    while let Some((cx, cy)) = queue.pop_front() {
-        for (dx, dy) in Direction::DIRECTION4.iter().map(|x| x.to_tuple()) {
-            if cx + dx < 0 || cy + dy < 0 {
-                continue;
-            }
-            let nx = (cx + dx) as usize;
-            let ny = (cy + dy) as usize;
-            if MAP_SIZE <= nx || MAP_SIZE <= ny || blocks[nx][ny] || steps[nx][ny] != INVALID {
-                continue;
-            }
-
-            steps[nx][ny] = steps[cx as usize][cy as usize] + 1;
-            steps_from[nx][ny] = (cx, cy);
-            queue.push_back((nx as i32, ny as i32));
-        }
-    }
-
-    (steps, steps_from)
-}
-
-fn calc_distance(blocks: &[Vec<bool>], pets: &[Pet]) -> Vec<Vec<i32>> {
-    let mut distance = vec![vec![INVALID; MAP_SIZE]; MAP_SIZE];
-    let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
-    for pos in pets.iter().map(|x| x.position) {
-        distance[pos.x as usize][pos.y as usize] = 0;
-        queue.push_back((pos.x, pos.y));
-    }
-
-    while let Some((cx, cy)) = queue.pop_front() {
-        for (dx, dy) in Direction::DIRECTION4.iter().map(|x| x.to_tuple()) {
-            if cx + dx < 0 || cy + dy < 0 {
-                continue;
-            }
-            let nx = (cx + dx) as usize;
-            let ny = (cy + dy) as usize;
-            if MAP_SIZE <= nx || MAP_SIZE <= ny || blocks[nx][ny] || distance[nx][ny] != INVALID {
-                continue;
-            }
-
-            distance[nx][ny] = distance[cx as usize][cy as usize] + 1;
-            queue.push_back((nx as i32, ny as i32));
-        }
-    }
-
-    distance
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -199,13 +132,13 @@ impl Direction {
         }
     }
 
-    fn to_tuple(&self) -> (i32, i32) {
+    fn to_vector(&self) -> Vector {
         match self {
-            Direction::None => (0, 0),
-            Direction::Up => (-1, 0),
-            Direction::Down => (1, 0),
-            Direction::Left => (0, -1),
-            Direction::Right => (0, 1),
+            Direction::None => Vector::new(0, 0),
+            Direction::Up => Vector::new(-1, 0),
+            Direction::Down => Vector::new(1, 0),
+            Direction::Left => Vector::new(0, -1),
+            Direction::Right => Vector::new(0, 1),
         }
     }
 
@@ -219,13 +152,13 @@ impl Direction {
         }
     }
 
-    fn from_tuple(v: (i32, i32)) -> Direction {
+    fn from_vector(v: Vector) -> Direction {
         match v {
-            (-1, 0) => Direction::Up,
-            (1, 0) => Direction::Down,
-            (0, -1) => Direction::Left,
-            (0, 1) => Direction::Right,
-            (_, _) => Direction::None,
+            Vector { x: -1, y: 0 } => Direction::Up,
+            Vector { x: 1, y: 0 } => Direction::Down,
+            Vector { x: 0, y: -1 } => Direction::Left,
+            Vector { x: 0, y: 1 } => Direction::Right,
+            _ => Direction::None,
         }
     }
 
@@ -247,30 +180,21 @@ struct Vector {
 }
 
 impl Vector {
-    fn distance(&self, other: &Vector) -> i32 {
-        (self.x - other.x).abs() + (self.y - other.y).abs()
+    fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
     }
 
-    fn translate(&mut self, dx: i32, dy: i32) {
-        self.x += dx;
-        self.y += dy;
+    fn translate(&mut self, v: &Vector) {
+        self.x += v.x;
+        self.y += v.y;
     }
 
-    fn translate_by_direction(&mut self, dir: &Direction) {
-        let (x, y) = dir.to_tuple();
-        self.translate(x, y);
-    }
-
-    fn neighbor(&self, dir: &Direction) -> Vector {
-        let (x, y) = dir.to_tuple();
+    fn neighbor(&self, direction: &Direction) -> Vector {
+        let v = direction.to_vector();
         Self {
-            x: self.x + x,
-            y: self.y + y,
+            x: self.x + v.x,
+            y: self.y + v.y,
         }
-    }
-
-    fn is_valid(&self) -> bool {
-        0 <= self.x && self.x < MAP_SIZE as i32 && 0 <= self.y && self.y < MAP_SIZE as i32
     }
 }
 
@@ -287,8 +211,8 @@ impl Pet {
     }
 
     fn act(&mut self, action: &[Direction]) {
-        for dir in action {
-            self.position.translate_by_direction(dir);
+        for direction in action {
+            self.position.translate(&direction.to_vector());
         }
     }
 }
@@ -307,187 +231,159 @@ impl Human {
         }
     }
 
-    fn act(
-        &mut self,
-        human_exists: &[Vec<bool>],
-        pet_exists: &[Vec<bool>],
-        blocks: &mut [Vec<bool>],
-    ) -> char {
-        if self.is_up_limit() {
-            // UL
-            if self.is_left_limit() {
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
-                if result != '.' {
-                    return result;
-                }
+    fn act(&mut self, grid: &mut Grid) -> char {
+        let move_char = |direction: &Direction| direction.to_char();
+        let block_char = |direction: &Direction| direction.to_char().to_ascii_lowercase();
 
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
-                if result != '.' {
-                    return result;
-                }
-
-                let result = self.move_or_stay(blocks, &Direction::Right);
-                if result != '.' {
-                    return result;
-                }
+        // UL
+        if self.is_up_limit() && self.is_left_limit() {
+            let direction = Direction::Left;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            // UR
-            if self.is_right_limit() {
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
-                if result != '.' {
-                    return result;
-                }
+            let direction = Direction::Up;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
 
-                let result =
-                    self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
-                if result != '.' {
-                    return result;
-                }
-
-                let result = self.move_or_stay(blocks, &Direction::Down);
-                if result != '.' {
-                    return result;
-                }
+            let direction = Direction::Right;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
-        if self.is_down_limit() {
-            // DR
-            if self.is_right_limit() {
-                let result =
-                    self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
-                if result != '.' {
-                    return result;
-                }
-
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
-                if result != '.' {
-                    return result;
-                }
-
-                let result = self.move_or_stay(blocks, &Direction::Left);
-                if result != '.' {
-                    return result;
-                }
+        // UR
+        if self.is_up_limit() && self.is_right_limit() {
+            let direction = Direction::Up;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            // DL
-            if self.is_left_limit() {
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
-                if result != '.' {
-                    return result;
-                }
+            let direction = Direction::Right;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
 
-                let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
-                if result != '.' {
-                    return result;
-                }
+            let direction = Direction::Down;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
+            }
+        }
 
-                let result = self.move_or_stay(blocks, &Direction::Up);
-                if result != '.' {
-                    return result;
-                }
+        // DR
+        if self.is_down_limit() && self.is_right_limit() {
+            let direction = Direction::Right;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
+
+            let direction = Direction::Down;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
+
+            let direction = Direction::Left;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
+            }
+        }
+
+        // DL
+        if self.is_down_limit() && self.is_left_limit() {
+            let direction = Direction::Down;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
+
+            let direction = Direction::Left;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
+            }
+
+            let direction = Direction::Up;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
         // U
         if self.is_up_limit() {
-            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Up);
-            if result != '.' {
-                return result;
+            let direction = Direction::Up;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            let result = self.move_or_stay(blocks, &Direction::Right);
-            if result != '.' {
-                return result;
+            let direction = Direction::Right;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
         // R
         if self.is_right_limit() {
-            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Right);
-            if result != '.' {
-                return result;
+            let direction = Direction::Right;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            let result = self.move_or_stay(blocks, &Direction::Down);
-            if result != '.' {
-                return result;
+            let direction = Direction::Down;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
         // D
         if self.is_down_limit() {
-            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Down);
-            if result != '.' {
-                return result;
+            let direction = Direction::Down;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            let result = self.move_or_stay(blocks, &Direction::Left);
-            if result != '.' {
-                return result;
+            let direction = Direction::Left;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
         // L
         if self.is_left_limit() {
-            let result = self.block_or_stay(human_exists, pet_exists, blocks, &Direction::Left);
-            if result != '.' {
-                return result;
+            let direction = Direction::Left;
+            if self.try_block(grid, &direction) {
+                return block_char(&direction);
             }
 
-            let result = self.move_or_stay(blocks, &Direction::Up);
-            if result != '.' {
-                return result;
+            let direction = Direction::Up;
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
             }
         }
 
-        self.move_or_stay(blocks, &Direction::Up)
-    }
-
-    fn move_or_stay(&mut self, blocks: &mut [Vec<bool>], direction: &Direction) -> char {
-        let p = self.position.neighbor(&direction);
-        return if !blocks[p.x as usize][p.y as usize] {
-            self.position = p;
-            direction.to_char()
+        let direction = Direction::Up;
+        return if self.try_move(grid, &direction) {
+            move_char(&direction)
         } else {
             '.'
         };
     }
 
-    fn block_or_stay(
-        &self,
-        human_exists: &[Vec<bool>],
-        pet_exists: &[Vec<bool>],
-        blocks: &mut [Vec<bool>],
-        direction: &Direction,
-    ) -> char {
-        let is_blockable =
-            |human_exists: &[Vec<bool>], pet_exists: &[Vec<bool>], position: &Vector| -> bool {
-                if human_exists[position.x as usize][position.y as usize]
-                    || pet_exists[position.x as usize][position.y as usize]
-                {
-                    return false;
-                }
-
-                for dir in &Direction::DIRECTION4 {
-                    let p = position.neighbor(&dir);
-                    if p.is_valid() && pet_exists[p.x as usize][p.y as usize] {
-                        return false;
-                    }
-                }
-
-                true
-            };
-
-        let p = self.position.neighbor(&direction);
-        return if !blocks[p.x as usize][p.y as usize] && is_blockable(human_exists, pet_exists, &p)
-        {
-            blocks[p.x as usize][p.y as usize] = true;
-            direction.to_char().to_ascii_lowercase()
+    fn try_move(&mut self, grid: &mut Grid, direction: &Direction) -> bool {
+        let position = self.position.neighbor(&direction);
+        return if grid.is_movable(&position) {
+            self.position = position;
+            true
         } else {
-            '.'
+            false
+        };
+    }
+
+    fn try_block(&self, grid: &mut Grid, direction: &Direction) -> bool {
+        let position = self.position.neighbor(&direction);
+        return if grid.is_blockable(&position) {
+            grid.block(&position);
+            true
+        } else {
+            false
         };
     }
 
@@ -517,21 +413,21 @@ struct Area {
 impl Area {
     fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         Self {
-            position1: Vector { x: x1, y: y1 },
-            position2: Vector { x: x2, y: y2 },
+            position1: Vector::new(x1, y1),
+            position2: Vector::new(x2, y2),
         }
     }
 
     fn combine(&self, other: &Area) -> Self {
         Self {
-            position1: Vector {
-                x: self.position1.x.min(other.position1.x),
-                y: self.position1.y.min(other.position1.y),
-            },
-            position2: Vector {
-                x: self.position2.x.max(other.position2.x),
-                y: self.position2.y.max(other.position2.y),
-            },
+            position1: Vector::new(
+                self.position1.x.min(other.position1.x),
+                self.position1.y.min(other.position1.y),
+            ),
+            position2: Vector::new(
+                self.position2.x.max(other.position2.x),
+                self.position2.y.max(other.position2.y),
+            ),
         }
     }
 
@@ -556,5 +452,126 @@ impl Area {
 
     fn is_right_edge(&self, position: &Vector) -> bool {
         position.y == self.position2.y
+    }
+}
+
+struct Grid {
+    size: usize,
+    human_exists: Vec<Vec<bool>>,
+    pet_exists: Vec<Vec<bool>>,
+    block_exists: Vec<Vec<bool>>,
+}
+
+impl Grid {
+    const INVALID: i32 = -1;
+
+    fn new(size: usize) -> Self {
+        Self {
+            size,
+            human_exists: vec![vec![false; size]; size],
+            pet_exists: vec![vec![false; size]; size],
+            block_exists: vec![vec![false; size]; size],
+        }
+    }
+
+    fn init(&mut self) {
+        for i in 0..self.size {
+            self.block_exists[0][i] = true;
+            self.block_exists[self.size - 1][i] = true;
+            self.block_exists[i][0] = true;
+            self.block_exists[i][self.size - 1] = true;
+        }
+    }
+
+    fn update_human_exists(&mut self, humans: &[Human]) {
+        self.human_exists = vec![vec![false; self.size]; self.size];
+        for position in humans.iter().map(|x| x.position) {
+            self.human_exists[position.x as usize][position.y as usize] = true;
+        }
+    }
+
+    fn update_pet_exists(&mut self, pets: &[Pet]) {
+        self.pet_exists = vec![vec![false; self.size]; self.size];
+        for position in pets.iter().map(|x| x.position) {
+            self.pet_exists[position.x as usize][position.y as usize] = true;
+        }
+    }
+
+    fn calc_distance_from(&self, position: &Vector) -> (Vec<Vec<i32>>, Vec<Vec<Vector>>) {
+        let mut distance = vec![vec![Self::INVALID; self.size]; self.size];
+        let mut steps_from =
+            vec![vec![Vector::new(Self::INVALID, Self::INVALID); self.size]; self.size];
+        let mut queue: VecDeque<Vector> = VecDeque::new();
+        queue.push_back(position.clone());
+        distance[position.x as usize][position.y as usize] = 0;
+
+        while let Some(cp) = queue.pop_front() {
+            for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(x)) {
+                if self.is_movable(&np) && distance[np.x as usize][np.y as usize] == Self::INVALID {
+                    distance[np.x as usize][np.y as usize] =
+                        distance[cp.x as usize][cp.y as usize] + 1;
+                    steps_from[np.x as usize][np.y as usize] = cp.clone();
+                    queue.push_back(np);
+                }
+            }
+        }
+
+        (distance, steps_from)
+    }
+
+    fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
+        let mut distance = vec![vec![Self::INVALID; self.size]; self.size];
+        let mut queue: VecDeque<Vector> = VecDeque::new();
+        for position in pets.iter().map(|x| x.position) {
+            distance[position.x as usize][position.y as usize] = 0;
+            queue.push_back(position.clone());
+        }
+
+        while let Some(cp) = queue.pop_front() {
+            for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(x)) {
+                if self.is_movable(&np) && distance[np.x as usize][np.y as usize] == Self::INVALID {
+                    distance[np.x as usize][np.y as usize] =
+                        distance[cp.x as usize][cp.y as usize] + 1;
+                    queue.push_back(np);
+                }
+            }
+        }
+
+        distance
+    }
+
+    fn is_valid(&self, position: &Vector) -> bool {
+        0 <= position.x
+            && position.x < self.size as i32
+            && 0 <= position.y
+            && position.y < self.size as i32
+    }
+
+    fn is_movable(&self, position: &Vector) -> bool {
+        self.is_valid(&position) && !self.block_exists[position.x as usize][position.y as usize]
+    }
+
+    fn is_blockable(&self, position: &Vector) -> bool {
+        if !self.is_valid(&position)
+            || self.block_exists[position.x as usize][position.y as usize]
+            || self.human_exists[position.x as usize][position.y as usize]
+            || self.pet_exists[position.x as usize][position.y as usize]
+        {
+            return false;
+        }
+
+        for np in Direction::DIRECTION4.iter().map(|x| position.neighbor(x)) {
+            if self.is_valid(&np) && self.pet_exists[np.x as usize][np.y as usize] {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn block(&mut self, position: &Vector) {
+        if self.is_blockable(&position) {
+            self.block_exists[position.x as usize][position.y as usize] = true;
+        }
     }
 }
