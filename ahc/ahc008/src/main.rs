@@ -28,10 +28,21 @@ fn main() {
             from &mut source,
             px: i32,
             py: i32,
-            _pt: usize,
+            pt: usize,
         }
 
-        pets.push(Pet::new(px, py));
+        pets.push(Pet::new(
+            px,
+            py,
+            match pt {
+                1 => Kind::COW,
+                2 => Kind::PIG,
+                3 => Kind::RABBIT,
+                4 => Kind::DOG,
+                5 => Kind::CAT,
+                _ => Kind::NONE,
+            },
+        ));
     }
 
     input! {
@@ -53,40 +64,8 @@ fn main() {
     let mut grid = Grid::new(GRID_SIZE);
     grid.init();
 
-    fn update_human_areas(grid: &Grid, humans: &mut [Human], pets: &[Pet]) {
-        let distance = grid.calc_distance(&pets);
-        for i in 0..humans.len() {
-            let position = &humans[i].position;
-            let mut d = distance[position.x as usize][position.y as usize];
-            if d == Grid::INVALID_I32 {
-                continue;
-            }
-            d = d.max(5);
-            let x1 = (position.x - d).max(GRID_MIN - 1).min(GRID_MAX + 1);
-            let y1 = (position.y - d).max(GRID_MIN - 1).min(GRID_MAX + 1);
-            let x2 = (position.x + d).max(GRID_MIN - 1).min(GRID_MAX + 1);
-            let y2 = (position.y + d).max(GRID_MIN - 1).min(GRID_MAX + 1);
-            humans[i].area = Area::new(x1, y1, x2, y2);
-        }
-
-        for i in 0..humans.len() {
-            let mut area = humans[i].area.clone();
-            for j in 0..humans.len() {
-                if area.intersect(&humans[j].area) {
-                    area = area.combine(&humans[j].area);
-                }
-            }
-            humans[i].area = area;
-        }
-    }
-
-    for i in 0..300 {
-        grid.update_human_exists(&humans);
-        grid.update_pet_exists(&pets);
-
-        if i % 100 == 0 {
-            update_human_areas(&grid, &mut humans, &pets);
-        }
+    for _ in 0..300 {
+        grid.update(&humans, &pets);
 
         let mut answer = vec!['.'; m];
         for (i, human) in humans.iter_mut().enumerate() {
@@ -104,6 +83,17 @@ fn main() {
             pet.act(&action);
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+struct Kind(i32);
+impl Kind {
+    const NONE: Kind = Kind(0);
+    const COW: Kind = Kind(1 << 0);
+    const PIG: Kind = Kind(1 << 1);
+    const RABBIT: Kind = Kind(1 << 2);
+    const DOG: Kind = Kind(1 << 3);
+    const CAT: Kind = Kind(1 << 4);
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -202,12 +192,14 @@ impl Vector {
 #[derive(Debug, Clone)]
 struct Pet {
     position: Vector,
+    kind: Kind,
 }
 
 impl Pet {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(x: i32, y: i32, kind: Kind) -> Self {
         Self {
             position: Vector { x, y },
+            kind,
         }
     }
 
@@ -222,134 +214,65 @@ impl Pet {
 #[derive(Debug, Clone)]
 struct Human {
     position: Vector,
-    area: Area,
 }
 
 impl Human {
     fn new(x: i32, y: i32) -> Self {
         Self {
             position: Vector { x, y },
-            area: Area::new(0, 0, 0, 0),
         }
     }
 
     fn act(&mut self, grid: &mut Grid) -> char {
-        // UL
-        if self.is_up_limit() && self.is_left_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Left) {
-                return result;
-            }
-
-            if let Some(result) = self.try_block(grid, &Direction::Up) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Right) {
-                return result;
-            }
+        let distance = grid.distances[self.position.x as usize][self.position.y as usize];
+        if distance == Grid::INVALID_I32 {
+            return '.';
         }
 
-        // UR
-        if self.is_up_limit() && self.is_right_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Up) {
-                return result;
+        if distance > 4 {
+            for direction in Direction::DIRECTION4.iter() {
+                let np = self.position.neighbor(&direction);
+                if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] < distance {
+                    if let Some(result) = self.try_move_to(grid, &direction) {
+                        return result;
+                    }
+                }
             }
-
-            if let Some(result) = self.try_block(grid, &Direction::Right) {
-                return result;
+        } else if distance < 3 {
+            for direction in Direction::DIRECTION4.iter() {
+                let np = self.position.neighbor(&direction);
+                if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] > distance {
+                    if let Some(result) = self.try_move_to(grid, &direction) {
+                        return result;
+                    }
+                }
             }
+        } else {
+            let blocked = Direction::DIRECTION4
+                .iter()
+                .map(|x| self.position.neighbor(x))
+                .filter(|v| grid.block_exists[v.x as usize][v.y as usize])
+                .count();
 
-            if let Some(result) = self.try_move(grid, &Direction::Down) {
-                return result;
-            }
-        }
-
-        // DR
-        if self.is_down_limit() && self.is_right_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Right) {
-                return result;
-            }
-
-            if let Some(result) = self.try_block(grid, &Direction::Down) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Left) {
-                return result;
-            }
-        }
-
-        // DL
-        if self.is_down_limit() && self.is_left_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Down) {
-                return result;
-            }
-
-            if let Some(result) = self.try_block(grid, &Direction::Left) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Up) {
-                return result;
+            if blocked < 2 {
+                for direction in Direction::DIRECTION4.iter() {
+                    let np = self.position.neighbor(&direction);
+                    if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] < distance
+                    {
+                        if let Some(result) = self.try_block(grid, &direction) {
+                            return result;
+                        }
+                    }
+                }
             }
         }
-
-        // U
-        if self.is_up_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Up) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Right) {
-                return result;
-            }
-        }
-
-        // R
-        if self.is_right_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Right) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Down) {
-                return result;
-            }
-        }
-
-        // D
-        if self.is_down_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Down) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Left) {
-                return result;
-            }
-        }
-
-        // L
-        if self.is_left_limit() {
-            if let Some(result) = self.try_block(grid, &Direction::Left) {
-                return result;
-            }
-
-            if let Some(result) = self.try_move(grid, &Direction::Up) {
-                return result;
-            }
-        }
-
-        for direction in &Direction::DIRECTION4 {
-            if let Some(result) = self.try_move(grid, &direction) {
-                return result;
-            }
-        }
-
         '.'
     }
 
-    fn try_move(&mut self, grid: &mut Grid, direction: &Direction) -> Option<char> {
+    fn try_move_to(&mut self, grid: &mut Grid, direction: &Direction) -> Option<char> {
         let position = self.position.neighbor(&direction);
         return if grid.is_movable(&position) {
+            grid.move_to(&position);
             self.position = position;
             Some(direction.to_char())
         } else {
@@ -366,73 +289,6 @@ impl Human {
             None
         };
     }
-
-    fn is_up_limit(&self) -> bool {
-        self.area.is_up_edge(&self.position)
-    }
-
-    fn is_down_limit(&self) -> bool {
-        self.area.is_down_edge(&self.position)
-    }
-
-    fn is_left_limit(&self) -> bool {
-        self.area.is_left_edge(&self.position)
-    }
-
-    fn is_right_limit(&self) -> bool {
-        self.area.is_right_edge(&self.position)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Area {
-    position1: Vector,
-    position2: Vector,
-}
-
-impl Area {
-    fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
-        Self {
-            position1: Vector::new(x1, y1),
-            position2: Vector::new(x2, y2),
-        }
-    }
-
-    fn combine(&self, other: &Area) -> Self {
-        Self {
-            position1: Vector::new(
-                self.position1.x.min(other.position1.x),
-                self.position1.y.min(other.position1.y),
-            ),
-            position2: Vector::new(
-                self.position2.x.max(other.position2.x),
-                self.position2.y.max(other.position2.y),
-            ),
-        }
-    }
-
-    fn intersect(&self, other: &Area) -> bool {
-        self.position1.x <= other.position2.x
-            && other.position1.x <= self.position2.x
-            && self.position1.y <= other.position2.y
-            && other.position1.y <= self.position2.y
-    }
-
-    fn is_up_edge(&self, position: &Vector) -> bool {
-        position.x - 1 == self.position1.x
-    }
-
-    fn is_down_edge(&self, position: &Vector) -> bool {
-        position.x + 1 == self.position2.x
-    }
-
-    fn is_left_edge(&self, position: &Vector) -> bool {
-        position.y - 1 == self.position1.y
-    }
-
-    fn is_right_edge(&self, position: &Vector) -> bool {
-        position.y + 1 == self.position2.y
-    }
 }
 
 struct Grid {
@@ -440,6 +296,7 @@ struct Grid {
     human_exists: Vec<Vec<bool>>,
     pet_exists: Vec<Vec<bool>>,
     block_exists: Vec<Vec<bool>>,
+    distances: Vec<Vec<i32>>,
 }
 
 impl Grid {
@@ -455,6 +312,7 @@ impl Grid {
             human_exists: vec![vec![false; size]; size],
             pet_exists: vec![vec![false; size]; size],
             block_exists: vec![vec![false; size]; size],
+            distances: vec![vec![Self::INVALID_I32; size]; size],
         }
     }
 
@@ -465,6 +323,12 @@ impl Grid {
             self.block_exists[i][0] = true;
             self.block_exists[i][self.size - 1] = true;
         }
+    }
+
+    fn update(&mut self, humans: &[Human], pets: &[Pet]) {
+        self.update_human_exists(humans);
+        self.update_pet_exists(pets);
+        self.distances = self.calc_distance(pets);
     }
 
     fn update_human_exists(&mut self, humans: &[Human]) {
@@ -507,7 +371,12 @@ impl Grid {
     fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
         let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
-        for position in pets.iter().map(|x| x.position) {
+        let filter = Kind::COW.0 | Kind::PIG.0 | Kind::RABBIT.0;
+        for position in pets
+            .iter()
+            .filter(|x| (x.kind.0 & filter) > 0)
+            .map(|x| x.position)
+        {
             distance[position.x as usize][position.y as usize] = 0;
             queue.push_back(position.clone());
         }
@@ -554,6 +423,12 @@ impl Grid {
         }
 
         true
+    }
+
+    fn move_to(&mut self, position: &Vector) {
+        if self.is_movable(&position) {
+            self.human_exists[position.x as usize][position.y as usize] = true;
+        }
     }
 
     fn block(&mut self, position: &Vector) {
