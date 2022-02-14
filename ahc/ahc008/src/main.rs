@@ -8,6 +8,7 @@ use itertools::Itertools;
 use proconio::marker::Chars;
 use proconio::source::line::LineSource;
 use proconio::*;
+use rand::Rng;
 
 const GRID_SIZE: usize = 30 + 2;
 const GRID_MIN: i32 = 1;
@@ -64,12 +65,13 @@ fn main() {
     let mut grid = Grid::new(GRID_SIZE);
     grid.init();
 
+    let threshold = (n - m).max(4).min(10) as i32;
     for _ in 0..300 {
         grid.update(&humans, &pets);
 
         let mut answer = vec!['.'; m];
         for (i, human) in humans.iter_mut().enumerate() {
-            answer[i] = human.act(&mut grid);
+            answer[i] = human.act(&mut grid, threshold);
         }
 
         println!("{}", answer.into_iter().join(""));
@@ -223,13 +225,13 @@ impl Human {
         }
     }
 
-    fn act(&mut self, grid: &mut Grid) -> char {
+    fn act(&mut self, grid: &mut Grid, threshold: i32) -> char {
         let distance = grid.distances[self.position.x as usize][self.position.y as usize];
         if distance == Grid::INVALID_I32 {
             return '.';
         }
 
-        if distance > 4 {
+        if distance > threshold {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.position.neighbor(&direction);
                 if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] < distance {
@@ -371,10 +373,13 @@ impl Grid {
     fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
         let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
-        let filter = Kind::COW.0 | Kind::PIG.0 | Kind::RABBIT.0;
         for position in pets
             .iter()
-            .filter(|x| (x.kind.0 & filter) > 0)
+            .filter(|x| {
+                (x.kind.0 & (Kind::COW.0 | Kind::PIG.0 | Kind::RABBIT.0)) > 0
+                    || x.kind == Kind::CAT && rand::thread_rng().gen_bool(1.0 / 2.0)
+                    || x.kind == Kind::DOG && rand::thread_rng().gen_bool(1.0 / 3.0)
+            })
             .map(|x| x.position)
         {
             distance[position.x as usize][position.y as usize] = 0;
