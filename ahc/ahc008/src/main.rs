@@ -9,7 +9,9 @@ use proconio::marker::Chars;
 use proconio::source::line::LineSource;
 use proconio::*;
 
-const MAP_SIZE: usize = 30 + 2;
+const GRID_SIZE: usize = 30 + 2;
+const GRID_MIN: i32 = 1;
+const GRID_MAX: i32 = 30;
 
 fn main() {
     let stdin = io::stdin();
@@ -48,39 +50,43 @@ fn main() {
         humans.push(Human::new(hx, hy));
     }
 
-    let mut grid = Grid::new(MAP_SIZE);
+    let mut grid = Grid::new(GRID_SIZE);
     grid.init();
 
-    for i in 0..m {
-        let mut d = 1e9 as i32;
-        for j in 0..n {
-            d = d.min(
-                (&pets[j].position.x - &humans[i].position.x).abs()
-                    + (&pets[j].position.y - &humans[i].position.y).abs(),
-            );
-        }
-
-        let x1 = (&humans[i].position.x - d).max(1).min(30);
-        let y1 = (&humans[i].position.y - d).max(1).min(30);
-        let x2 = (&humans[i].position.x + d).max(1).min(30);
-        let y2 = (&humans[i].position.y + d).max(1).min(30);
-        humans[i].area = Area::new(x1, y1, x2, y2);
-    }
-
-    for i in 0..m {
-        let mut area = humans[i].area.clone();
-        for j in 0..m {
-            if area.intersect(&humans[j].area) {
-                area = area.combine(&humans[j].area);
+    fn update_human_areas(grid: &Grid, humans: &mut [Human], pets: &[Pet]) {
+        let distance = grid.calc_distance(&pets);
+        for i in 0..humans.len() {
+            let position = &humans[i].position;
+            let mut d = distance[position.x as usize][position.y as usize];
+            if d == Grid::INVALID_I32 {
+                continue;
             }
+            d = d.max(5);
+            let x1 = (position.x - d).max(GRID_MIN - 1).min(GRID_MAX + 1);
+            let y1 = (position.y - d).max(GRID_MIN - 1).min(GRID_MAX + 1);
+            let x2 = (position.x + d).max(GRID_MIN - 1).min(GRID_MAX + 1);
+            let y2 = (position.y + d).max(GRID_MIN - 1).min(GRID_MAX + 1);
+            humans[i].area = Area::new(x1, y1, x2, y2);
         }
 
-        humans[i].area = area;
+        for i in 0..humans.len() {
+            let mut area = humans[i].area.clone();
+            for j in 0..humans.len() {
+                if area.intersect(&humans[j].area) {
+                    area = area.combine(&humans[j].area);
+                }
+            }
+            humans[i].area = area;
+        }
     }
 
-    for _ in 0..300 {
+    for i in 0..300 {
         grid.update_human_exists(&humans);
         grid.update_pet_exists(&pets);
+
+        if i % 100 == 0 {
+            update_human_areas(&grid, &mut humans, &pets);
+        }
 
         let mut answer = vec!['.'; m];
         for i in 0..m {
@@ -227,7 +233,7 @@ impl Human {
     fn new(x: i32, y: i32) -> Self {
         Self {
             position: Vector { x, y },
-            area: Area::new(0, 0, MAP_SIZE as i32, MAP_SIZE as i32),
+            area: Area::new(0, 0, 0, 0),
         }
     }
 
@@ -359,12 +365,13 @@ impl Human {
             }
         }
 
-        let direction = Direction::Up;
-        return if self.try_move(grid, &direction) {
-            move_char(&direction)
-        } else {
-            '.'
-        };
+        for direction in &Direction::DIRECTION4 {
+            if self.try_move(grid, &direction) {
+                return move_char(&direction);
+            }
+        }
+
+        '.'
     }
 
     fn try_move(&mut self, grid: &mut Grid, direction: &Direction) -> bool {
@@ -439,19 +446,19 @@ impl Area {
     }
 
     fn is_up_edge(&self, position: &Vector) -> bool {
-        position.x == self.position1.x
+        position.x - 1 == self.position1.x
     }
 
     fn is_down_edge(&self, position: &Vector) -> bool {
-        position.x == self.position2.x
+        position.x + 1 == self.position2.x
     }
 
     fn is_left_edge(&self, position: &Vector) -> bool {
-        position.y == self.position1.y
+        position.y - 1 == self.position1.y
     }
 
     fn is_right_edge(&self, position: &Vector) -> bool {
-        position.y == self.position2.y
+        position.y + 1 == self.position2.y
     }
 }
 
@@ -463,7 +470,11 @@ struct Grid {
 }
 
 impl Grid {
-    const INVALID: i32 = -1;
+    const INVALID_I32: i32 = -1;
+    const INVALID_VECTOR: Vector = Vector {
+        x: Self::INVALID_I32,
+        y: Self::INVALID_I32,
+    };
 
     fn new(size: usize) -> Self {
         Self {
@@ -498,16 +509,17 @@ impl Grid {
     }
 
     fn calc_distance_from(&self, position: &Vector) -> (Vec<Vec<i32>>, Vec<Vec<Vector>>) {
-        let mut distance = vec![vec![Self::INVALID; self.size]; self.size];
-        let mut steps_from =
-            vec![vec![Vector::new(Self::INVALID, Self::INVALID); self.size]; self.size];
+        let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
+        let mut steps_from = vec![vec![Self::INVALID_VECTOR; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
         queue.push_back(position.clone());
         distance[position.x as usize][position.y as usize] = 0;
 
         while let Some(cp) = queue.pop_front() {
             for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(x)) {
-                if self.is_movable(&np) && distance[np.x as usize][np.y as usize] == Self::INVALID {
+                if self.is_movable(&np)
+                    && distance[np.x as usize][np.y as usize] == Self::INVALID_I32
+                {
                     distance[np.x as usize][np.y as usize] =
                         distance[cp.x as usize][cp.y as usize] + 1;
                     steps_from[np.x as usize][np.y as usize] = cp.clone();
@@ -520,7 +532,7 @@ impl Grid {
     }
 
     fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
-        let mut distance = vec![vec![Self::INVALID; self.size]; self.size];
+        let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
         for position in pets.iter().map(|x| x.position) {
             distance[position.x as usize][position.y as usize] = 0;
@@ -529,7 +541,9 @@ impl Grid {
 
         while let Some(cp) = queue.pop_front() {
             for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(x)) {
-                if self.is_movable(&np) && distance[np.x as usize][np.y as usize] == Self::INVALID {
+                if self.is_movable(&np)
+                    && distance[np.x as usize][np.y as usize] == Self::INVALID_I32
+                {
                     distance[np.x as usize][np.y as usize] =
                         distance[cp.x as usize][cp.y as usize] + 1;
                     queue.push_back(np);
