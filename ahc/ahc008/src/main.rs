@@ -89,8 +89,8 @@ fn main() {
         }
 
         let mut answer = vec!['.'; m];
-        for i in 0..m {
-            answer[i] = humans[i].act(&mut grid);
+        for (i, human) in humans.iter_mut().enumerate() {
+            answer[i] = human.act(&mut grid);
         }
 
         println!("{}", answer.into_iter().join(""));
@@ -100,13 +100,8 @@ fn main() {
             actions: [Chars; n]
         }
 
-        for (i, action) in actions.into_iter().enumerate() {
-            pets[i].act(
-                &action
-                    .into_iter()
-                    .map(|c| Direction::from_char(c))
-                    .collect_vec(),
-            );
+        for (pet, action) in pets.iter_mut().zip(actions.into_iter()) {
+            pet.act(&action);
         }
     }
 }
@@ -216,9 +211,10 @@ impl Pet {
         }
     }
 
-    fn act(&mut self, action: &[Direction]) {
-        for direction in action {
-            self.position.translate(&direction.to_vector());
+    fn act(&mut self, action: &[char]) {
+        for c in action {
+            self.position
+                .translate(&Direction::from_char(*c).to_vector());
         }
     }
 }
@@ -238,159 +234,136 @@ impl Human {
     }
 
     fn act(&mut self, grid: &mut Grid) -> char {
-        let move_char = |direction: &Direction| direction.to_char();
-        let block_char = |direction: &Direction| direction.to_char().to_ascii_lowercase();
-
         // UL
         if self.is_up_limit() && self.is_left_limit() {
-            let direction = Direction::Left;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Left) {
+                return result;
             }
 
-            let direction = Direction::Up;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Up) {
+                return result;
             }
 
-            let direction = Direction::Right;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Right) {
+                return result;
             }
         }
 
         // UR
         if self.is_up_limit() && self.is_right_limit() {
-            let direction = Direction::Up;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Up) {
+                return result;
             }
 
-            let direction = Direction::Right;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Right) {
+                return result;
             }
 
-            let direction = Direction::Down;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Down) {
+                return result;
             }
         }
 
         // DR
         if self.is_down_limit() && self.is_right_limit() {
-            let direction = Direction::Right;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Right) {
+                return result;
             }
 
-            let direction = Direction::Down;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Down) {
+                return result;
             }
 
-            let direction = Direction::Left;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Left) {
+                return result;
             }
         }
 
         // DL
         if self.is_down_limit() && self.is_left_limit() {
-            let direction = Direction::Down;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Down) {
+                return result;
             }
 
-            let direction = Direction::Left;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Left) {
+                return result;
             }
 
-            let direction = Direction::Up;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Up) {
+                return result;
             }
         }
 
         // U
         if self.is_up_limit() {
-            let direction = Direction::Up;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Up) {
+                return result;
             }
 
-            let direction = Direction::Right;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Right) {
+                return result;
             }
         }
 
         // R
         if self.is_right_limit() {
-            let direction = Direction::Right;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Right) {
+                return result;
             }
 
-            let direction = Direction::Down;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Down) {
+                return result;
             }
         }
 
         // D
         if self.is_down_limit() {
-            let direction = Direction::Down;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Down) {
+                return result;
             }
 
-            let direction = Direction::Left;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Left) {
+                return result;
             }
         }
 
         // L
         if self.is_left_limit() {
-            let direction = Direction::Left;
-            if self.try_block(grid, &direction) {
-                return block_char(&direction);
+            if let Some(result) = self.try_block(grid, &Direction::Left) {
+                return result;
             }
 
-            let direction = Direction::Up;
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &Direction::Up) {
+                return result;
             }
         }
 
         for direction in &Direction::DIRECTION4 {
-            if self.try_move(grid, &direction) {
-                return move_char(&direction);
+            if let Some(result) = self.try_move(grid, &direction) {
+                return result;
             }
         }
 
         '.'
     }
 
-    fn try_move(&mut self, grid: &mut Grid, direction: &Direction) -> bool {
+    fn try_move(&mut self, grid: &mut Grid, direction: &Direction) -> Option<char> {
         let position = self.position.neighbor(&direction);
         return if grid.is_movable(&position) {
             self.position = position;
-            true
+            Some(direction.to_char())
         } else {
-            false
+            None
         };
     }
 
-    fn try_block(&self, grid: &mut Grid, direction: &Direction) -> bool {
+    fn try_block(&self, grid: &mut Grid, direction: &Direction) -> Option<char> {
         let position = self.position.neighbor(&direction);
         return if grid.is_blockable(&position) {
             grid.block(&position);
-            true
+            Some(direction.to_char().to_ascii_lowercase())
         } else {
-            false
+            None
         };
     }
 
