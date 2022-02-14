@@ -36,12 +36,12 @@ fn main() {
             px,
             py,
             match pt {
-                1 => Kind::COW,
-                2 => Kind::PIG,
-                3 => Kind::RABBIT,
-                4 => Kind::DOG,
-                5 => Kind::CAT,
-                _ => Kind::NONE,
+                1 => Kind::Cow,
+                2 => Kind::Pig,
+                3 => Kind::Rabbit,
+                4 => Kind::Dog,
+                5 => Kind::Cat,
+                _ => Kind::None,
             },
         ));
     }
@@ -87,15 +87,14 @@ fn main() {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct Kind(i32);
-impl Kind {
-    const NONE: Kind = Kind(0);
-    const COW: Kind = Kind(1 << 0);
-    const PIG: Kind = Kind(1 << 1);
-    const RABBIT: Kind = Kind(1 << 2);
-    const DOG: Kind = Kind(1 << 3);
-    const CAT: Kind = Kind(1 << 4);
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum Kind {
+    None,
+    Cow,
+    Pig,
+    Rabbit,
+    Dog,
+    Cat,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -371,17 +370,16 @@ impl Grid {
     }
 
     fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
+        let choice = |kind: &Kind| match kind {
+            Kind::Cow | Kind::Pig | Kind::Rabbit => true,
+            Kind::Dog => rand::thread_rng().gen_bool(1.0 / 3.0),
+            Kind::Cat => rand::thread_rng().gen_bool(1.0 / 2.0),
+            _ => false,
+        };
+
         let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
-        for position in pets
-            .iter()
-            .filter(|x| {
-                (x.kind.0 & (Kind::COW.0 | Kind::PIG.0 | Kind::RABBIT.0)) > 0
-                    || x.kind == Kind::CAT && rand::thread_rng().gen_bool(1.0 / 2.0)
-                    || x.kind == Kind::DOG && rand::thread_rng().gen_bool(1.0 / 3.0)
-            })
-            .map(|x| x.position)
-        {
+        for position in pets.iter().filter(|x| choice(&x.kind)).map(|x| x.position) {
             distance[position.x as usize][position.y as usize] = 0;
             queue.push_back(position.clone());
         }
