@@ -329,7 +329,20 @@ impl Grid {
     fn update(&mut self, humans: &[Human], pets: &[Pet]) {
         self.update_human_exists(humans);
         self.update_pet_exists(pets);
-        self.distances = self.calc_distance(pets);
+
+        let choice = |pet: &Pet| match pet.kind {
+            Kind::Cow | Kind::Pig | Kind::Rabbit => true,
+            Kind::Dog => rand::thread_rng().gen_bool(1.0 / 3.0),
+            Kind::Cat => rand::thread_rng().gen_bool(1.0 / 2.0),
+            _ => false,
+        };
+
+        let targets = pets
+            .iter()
+            .filter(|x| choice(x))
+            .map(|x| x.position)
+            .collect_vec();
+        self.distances = self.calc_distance(&targets);
     }
 
     fn update_human_exists(&mut self, humans: &[Human]) {
@@ -369,17 +382,10 @@ impl Grid {
         (distance, steps_from)
     }
 
-    fn calc_distance(&self, pets: &[Pet]) -> Vec<Vec<i32>> {
-        let choice = |kind: &Kind| match kind {
-            Kind::Cow | Kind::Pig | Kind::Rabbit => true,
-            Kind::Dog => rand::thread_rng().gen_bool(1.0 / 3.0),
-            Kind::Cat => rand::thread_rng().gen_bool(1.0 / 2.0),
-            _ => false,
-        };
-
+    fn calc_distance(&self, targets: &[Vector]) -> Vec<Vec<i32>> {
         let mut distance = vec![vec![Self::INVALID_I32; self.size]; self.size];
         let mut queue: VecDeque<Vector> = VecDeque::new();
-        for position in pets.iter().filter(|x| choice(&x.kind)).map(|x| x.position) {
+        for position in targets {
             distance[position.x as usize][position.y as usize] = 0;
             queue.push_back(position.clone());
         }
