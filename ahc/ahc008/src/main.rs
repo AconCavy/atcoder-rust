@@ -8,7 +8,6 @@ use itertools::Itertools;
 use proconio::marker::Chars;
 use proconio::source::line::LineSource;
 use proconio::*;
-use rand::Rng;
 
 const GRID_SIZE: usize = 30 + 2;
 const GRID_MIN: i32 = 1;
@@ -422,18 +421,7 @@ impl Grid {
         self.update_human_exists(humans);
         self.update_pet_exists(pets);
 
-        let choice = |pet: &Pet| match pet.kind {
-            Kind::Cow | Kind::Pig | Kind::Rabbit => true,
-            Kind::Dog => rand::thread_rng().gen_bool(1.0 / 3.0),
-            Kind::Cat => rand::thread_rng().gen_bool(1.0 / 2.0),
-            _ => false,
-        };
-
-        let targets = pets
-            .iter()
-            .filter(|x| choice(x))
-            .map(|x| x.position)
-            .collect_vec();
+        let targets = pets.iter().map(|x| x.position).collect_vec();
         self.distances = self.calc_distance(&targets);
     }
 
