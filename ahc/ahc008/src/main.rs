@@ -52,21 +52,16 @@ fn main() {
     }
 
     let mut humans = Vec::with_capacity(m);
-    for _ in 0..m {
+    for i in 0..m {
         input! {
             from &mut source,
             hx: i32,
             hy: i32,
         }
 
-        humans.push(Human::new(hx, hy));
-    }
-
-    for i in 0..m {
-        humans[i].axis = Vector {
-            x: GRID_MAX / m as i32 * i as i32 + 1,
-            y: GRID_MAX / 2,
-        };
+        let ax = GRID_MAX / m as i32 * i as i32 + 1;
+        let ay = GRID_MAX / 2;
+        humans.push(Human::new(hx, hy, ax, ay));
     }
 
     let mut grid = Grid::new(GRID_SIZE);
@@ -74,12 +69,6 @@ fn main() {
 
     for _ in 0..300 {
         grid.update(&humans, &pets);
-
-        if humans.iter().all(|x| x.phase == Phase::Sync) {
-            for human in humans.iter_mut() {
-                human.phase = Phase::Block;
-            }
-        }
 
         let mut answer = vec!['.'; m];
         for (i, human) in humans.iter_mut().enumerate() {
@@ -111,9 +100,9 @@ enum Kind {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Phase {
-    Setup,
+    Setup1,
     Wall,
-    Sync,
+    Setup2,
     Block,
 }
 
@@ -240,35 +229,37 @@ struct Human {
 }
 
 impl Human {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(x: i32, y: i32, ax: i32, ay: i32) -> Self {
         Self {
-            position: Vector { x, y },
-            phase: Phase::Setup,
-            axis: Vector { x, y },
+            position: Vector::new(x, y),
+            phase: Phase::Setup1,
+            axis: Vector::new(ax, ay),
         }
     }
 
     fn act(&mut self, grid: &mut Grid) -> char {
         match self.phase {
-            Phase::Setup => self.act_setup(grid),
+            Phase::Setup1 => self.act_setup1(grid),
             Phase::Wall => self.act_wall(grid),
-            Phase::Sync => self.act_sync(grid),
+            Phase::Setup2 => self.act_setup2(grid),
             Phase::Block => self.act_block(grid),
         }
     }
 
-    fn act_setup(&mut self, grid: &mut Grid) -> char {
+    fn act_setup1(&mut self, grid: &mut Grid) -> char {
         let position = Vector::new(self.axis.x, grid.get_movable_min());
-        if let Some(result) = self.try_approach_to(grid, &position) {
-            return result;
+        match self.try_approach_to(grid, &position) {
+            None => {
+                self.phase = Phase::Wall;
+                '.'
+            }
+            Some(result) => result,
         }
-
-        self.phase = Phase::Wall;
-        '.'
     }
 
     fn act_wall(&mut self, grid: &mut Grid) -> char {
-        if self.is_ignore_area() {
+        let d = 2;
+        if self.axis.y - d <= self.position.y && self.position.y <= self.axis.y + d {
             return match self.try_move_to(grid, &Direction::Right) {
                 None => '.',
                 Some(result) => result,
@@ -279,7 +270,7 @@ impl Human {
         return if grid.block_exists[up.x as usize][up.y as usize] {
             let end = Vector::new(self.axis.x, grid.get_movable_max());
             if self.position == end {
-                self.phase = Phase::Sync;
+                self.phase = Phase::Setup2;
                 return '.';
             }
 
@@ -295,9 +286,13 @@ impl Human {
         };
     }
 
-    fn act_sync(&mut self, grid: &mut Grid) -> char {
-        match self.try_approach_to(grid, &self.axis.clone()) {
-            None => '.',
+    fn act_setup2(&mut self, grid: &mut Grid) -> char {
+        let position = self.axis.clone();
+        match self.try_approach_to(grid, &position) {
+            None => {
+                self.phase = Phase::Block;
+                '.'
+            }
             Some(result) => result,
         }
     }
@@ -346,11 +341,6 @@ impl Human {
             }
         }
         '.'
-    }
-
-    fn is_ignore_area(&self) -> bool {
-        let d = 2;
-        self.axis.y - d <= self.position.y && self.position.y <= self.axis.y + d
     }
 
     fn try_approach_to(&mut self, grid: &mut Grid, position: &Vector) -> Option<char> {
