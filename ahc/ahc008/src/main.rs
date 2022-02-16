@@ -59,7 +59,8 @@ fn main() {
             hy: i32,
         }
 
-        let ax = GRID_MAX / m as i32 * i as i32 + 1;
+        let div = m.min(6) as i32;
+        let ax = GRID_MAX / div * (i as i32 % div) + 1;
         let ay = GRID_MAX / 2;
         humans.push(Human::new(hx, hy, ax, ay));
     }
