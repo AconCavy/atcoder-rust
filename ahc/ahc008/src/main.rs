@@ -12,6 +12,7 @@ use proconio::*;
 const GRID_SIZE: usize = 30 + 2;
 const GRID_MIN: i32 = 1;
 const GRID_MAX: i32 = 30;
+const TURN: usize = 300;
 
 fn main() {
     let stdin = io::stdin();
@@ -66,7 +67,7 @@ fn main() {
     let mut grid = Grid::new(GRID_SIZE);
     grid.init();
 
-    for _ in 0..300 {
+    for _ in 0..TURN {
         grid.update(&humans, &pets);
 
         let mut answer = vec!['.'; m];
