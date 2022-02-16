@@ -312,16 +312,7 @@ impl Human {
                     }
                 }
             }
-        } else if distance < 3 {
-            for direction in Direction::DIRECTION4.iter() {
-                let np = self.position.neighbor(&direction);
-                if grid.is_valid(&np) && grid.get_distance(&np) > distance {
-                    if let Some(result) = self.try_move_to(grid, &direction) {
-                        return result;
-                    }
-                }
-            }
-        } else {
+        } else if distance > 2 {
             let blocked = Direction::DIRECTION4
                 .iter()
                 .map(|x| self.position.neighbor(x))
@@ -336,6 +327,15 @@ impl Human {
                             return result;
                         }
                     }
+                }
+            }
+        }
+
+        for direction in Direction::DIRECTION4.iter() {
+            let np = self.position.neighbor(&direction);
+            if grid.is_valid(&np) && grid.get_distance(&np) > distance {
+                if let Some(result) = self.try_move_to(grid, &direction) {
+                    return result;
                 }
             }
         }
