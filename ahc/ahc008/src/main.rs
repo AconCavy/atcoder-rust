@@ -298,7 +298,7 @@ impl Human {
     }
 
     fn act_block(&mut self, grid: &mut Grid) -> char {
-        let distance = grid.distances[self.position.x as usize][self.position.y as usize];
+        let distance = grid.get_distance(&self.position);
         if distance == Grid::INVALID_I32 {
             return '.';
         }
@@ -306,7 +306,7 @@ impl Human {
         if distance > 5 {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.position.neighbor(&direction);
-                if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] < distance {
+                if grid.is_valid(&np) && grid.get_distance(&np) < distance {
                     if let Some(result) = self.try_move_to(grid, &direction) {
                         return result;
                     }
@@ -315,7 +315,7 @@ impl Human {
         } else if distance < 3 {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.position.neighbor(&direction);
-                if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] > distance {
+                if grid.is_valid(&np) && grid.get_distance(&np) > distance {
                     if let Some(result) = self.try_move_to(grid, &direction) {
                         return result;
                     }
@@ -331,8 +331,7 @@ impl Human {
             if blocked < 2 {
                 for direction in Direction::DIRECTION4.iter() {
                     let np = self.position.neighbor(&direction);
-                    if grid.is_valid(&np) && grid.distances[np.x as usize][np.y as usize] < distance
-                    {
+                    if grid.is_valid(&np) && grid.get_distance(&np) < distance {
                         if let Some(result) = self.try_block(grid, &direction) {
                             return result;
                         }
@@ -345,14 +344,23 @@ impl Human {
 
     fn try_approach_to(&mut self, grid: &mut Grid, position: &Vector) -> Option<char> {
         let distances = grid.calc_distance(&vec![position.clone()]);
-        let distance = distances[self.position.x as usize][self.position.y as usize];
+
+        let get_distance = |grid: &Grid, position: &Vector| -> i32 {
+            if grid.is_valid(&position) {
+                distances[position.x as usize][position.y as usize]
+            } else {
+                Grid::INVALID_I32
+            }
+        };
+
+        let distance = get_distance(grid, &self.position);
         if distance == Grid::INVALID_I32 {
             return None;
         }
 
         for direction in Direction::DIRECTION4.iter() {
             let np = self.position.neighbor(&direction);
-            if grid.is_valid(&np) && distances[np.x as usize][np.y as usize] < distance {
+            if grid.is_valid(&np) && get_distance(grid, &np) < distance {
                 if let Some(result) = self.try_move_to(grid, &direction) {
                     return Some(result);
                 }
@@ -490,6 +498,14 @@ impl Grid {
         }
 
         true
+    }
+
+    fn get_distance(&self, position: &Vector) -> i32 {
+        if self.is_valid(&position) {
+            self.distances[position.x as usize][position.y as usize]
+        } else {
+            Grid::INVALID_I32
+        }
     }
 
     fn move_to(&mut self, position: &Vector) {
