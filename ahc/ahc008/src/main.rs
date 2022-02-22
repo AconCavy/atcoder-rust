@@ -96,7 +96,7 @@ enum Kind {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum Phase {
+enum State {
     Setup1,
     Wall,
     Setup2,
@@ -221,7 +221,7 @@ impl Pet {
 #[derive(Debug, Clone)]
 struct Human {
     position: Vector,
-    phase: Phase,
+    state: State,
     axis: Vector,
 }
 
@@ -229,17 +229,17 @@ impl Human {
     fn new(x: i32, y: i32, ax: i32, ay: i32) -> Self {
         Self {
             position: Vector::new(x, y),
-            phase: Phase::Setup1,
+            state: State::Setup1,
             axis: Vector::new(ax, ay),
         }
     }
 
     fn act(&mut self, grid: &mut Grid) -> char {
-        match self.phase {
-            Phase::Setup1 => self.act_setup1(grid),
-            Phase::Wall => self.act_wall(grid),
-            Phase::Setup2 => self.act_setup2(grid),
-            Phase::Block => self.act_block(grid),
+        match self.state {
+            State::Setup1 => self.act_setup1(grid),
+            State::Wall => self.act_wall(grid),
+            State::Setup2 => self.act_setup2(grid),
+            State::Block => self.act_block(grid),
         }
     }
 
@@ -247,7 +247,7 @@ impl Human {
         let position = Vector::new(self.axis.x, grid.get_movable_min());
         match self.try_approach_to(grid, &position) {
             None => {
-                self.phase = Phase::Wall;
+                self.state = State::Wall;
                 '.'
             }
             Some(result) => result,
@@ -267,7 +267,7 @@ impl Human {
         return if grid.block_exists[up.x as usize][up.y as usize] {
             let end = Vector::new(self.axis.x, grid.get_movable_max());
             if self.position == end {
-                self.phase = Phase::Setup2;
+                self.state = State::Setup2;
                 return '.';
             }
 
@@ -287,7 +287,7 @@ impl Human {
         let position = self.axis.clone();
         match self.try_approach_to(grid, &position) {
             None => {
-                self.phase = Phase::Block;
+                self.state = State::Block;
                 '.'
             }
             Some(result) => result,
