@@ -37,12 +37,12 @@ fn main() {
             px,
             py,
             match pt {
-                1 => Kind::Cow,
-                2 => Kind::Pig,
-                3 => Kind::Rabbit,
-                4 => Kind::Dog,
-                5 => Kind::Cat,
-                _ => Kind::None,
+                1 => PetType::Cow,
+                2 => PetType::Pig,
+                3 => PetType::Rabbit,
+                4 => PetType::Dog,
+                5 => PetType::Cat,
+                _ => PetType::None,
             },
         ));
     }
@@ -84,24 +84,6 @@ fn main() {
             pet.act(&action);
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum Kind {
-    None,
-    Cow,
-    Pig,
-    Rabbit,
-    Dog,
-    Cat,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum State {
-    Setup1,
-    Wall,
-    Setup2,
-    Block,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -197,17 +179,27 @@ impl Vector {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum PetType {
+    None,
+    Cow,
+    Pig,
+    Rabbit,
+    Dog,
+    Cat,
+}
+
 #[derive(Debug, Clone)]
 struct Pet {
     position: Vector,
-    kind: Kind,
+    pet_type: PetType,
 }
 
 impl Pet {
-    fn new(x: i32, y: i32, kind: Kind) -> Self {
+    fn new(x: i32, y: i32, pet_type: PetType) -> Self {
         Self {
             position: Vector { x, y },
-            kind: kind,
+            pet_type,
         }
     }
 
@@ -219,10 +211,18 @@ impl Pet {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum HumanState {
+    Setup1,
+    Wall,
+    Setup2,
+    Block,
+}
+
 #[derive(Debug, Clone)]
 struct Human {
     position: Vector,
-    state: State,
+    state: HumanState,
     axis: Vector,
 }
 
@@ -230,17 +230,17 @@ impl Human {
     fn new(x: i32, y: i32, ax: i32, ay: i32) -> Self {
         Self {
             position: Vector::new(x, y),
-            state: State::Setup1,
+            state: HumanState::Setup1,
             axis: Vector::new(ax, ay),
         }
     }
 
     fn act(&mut self, world: &mut World) -> char {
         match self.state {
-            State::Setup1 => self.act_setup1(world),
-            State::Wall => self.act_wall(world),
-            State::Setup2 => self.act_setup2(world),
-            State::Block => self.act_block(world),
+            HumanState::Setup1 => self.act_setup1(world),
+            HumanState::Wall => self.act_wall(world),
+            HumanState::Setup2 => self.act_setup2(world),
+            HumanState::Block => self.act_block(world),
         }
     }
 
@@ -248,7 +248,7 @@ impl Human {
         let position = Vector::new(self.axis.x, grid.get_movable_min());
         match self.try_approach_to(grid, &position) {
             None => {
-                self.state = State::Wall;
+                self.state = HumanState::Wall;
                 '.'
             }
             Some(result) => result,
@@ -268,7 +268,7 @@ impl Human {
         return if world.block_exists[&up] {
             let end = Vector::new(self.axis.x, world.get_movable_max());
             if self.position == end {
-                self.state = State::Setup2;
+                self.state = HumanState::Setup2;
                 return '.';
             }
 
@@ -288,7 +288,7 @@ impl Human {
         let position = self.axis.clone();
         match self.try_approach_to(world, &position) {
             None => {
-                self.state = State::Block;
+                self.state = HumanState::Block;
                 '.'
             }
             Some(result) => result,
