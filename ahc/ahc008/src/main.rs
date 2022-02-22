@@ -550,26 +550,26 @@ impl<T: std::clone::Clone> Index<&Vector> for Grid<T> {
     type Output = T;
 
     fn index(&self, index: &Vector) -> &Self::Output {
-        &self.values[index.x as usize * self.x + index.y as usize]
+        &self.values[index.x as usize * self.y + index.y as usize]
     }
 }
 
 impl<T: std::clone::Clone> IndexMut<&Vector> for Grid<T> {
     fn index_mut(&mut self, index: &Vector) -> &mut Self::Output {
-        &mut self.values[index.x as usize * self.x + index.y as usize]
+        &mut self.values[index.x as usize * self.y + index.y as usize]
     }
 }
 
 impl<T: std::clone::Clone> Index<(usize, usize)> for Grid<T> {
     type Output = T;
 
-    fn index(&self, index: (usize, usize)) -> &Self::Output {
-        &self.values[index.0 * self.x + index.1]
+    fn index(&self, (x, y): (usize, usize)) -> &Self::Output {
+        &self.values[x * self.y + y]
     }
 }
 
 impl<T: std::clone::Clone> IndexMut<(usize, usize)> for Grid<T> {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        &mut self.values[(index.0 * self.x + index.1) as usize]
+    fn index_mut(&mut self, (x, y): (usize, usize)) -> &mut Self::Output {
+        &mut self.values[(x * self.y + y) as usize]
     }
 }
