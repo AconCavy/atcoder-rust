@@ -66,7 +66,10 @@ fn main() {
         humans.push(Human::new(hx, hy, ax, ay));
     }
 
-    let mut world = World::new(GRID_SIZE);
+    let mut block_map = BlockMap::new(GRID_SIZE);
+    block_map.init();
+
+    let mut world = World::new(GRID_SIZE, block_map);
     world.init();
 
     for _ in 0..TURN {
@@ -392,6 +395,7 @@ impl Human {
 
 struct World {
     size: usize,
+    block_map: BlockMap,
     human_exists: Grid<bool>,
     pet_exists: Grid<bool>,
     block_exists: Grid<bool>,
@@ -405,9 +409,10 @@ impl World {
         y: Self::INVALID_I32,
     };
 
-    fn new(size: usize) -> Self {
+    fn new(size: usize, block_map: BlockMap) -> Self {
         Self {
             size,
+            block_map,
             human_exists: Grid::new(size, size, false),
             pet_exists: Grid::new(size, size, false),
             block_exists: Grid::new(size, size, false),
@@ -571,5 +576,69 @@ impl<T: std::clone::Clone> Index<(usize, usize)> for Grid<T> {
 impl<T: std::clone::Clone> IndexMut<(usize, usize)> for Grid<T> {
     fn index_mut(&mut self, (x, y): (usize, usize)) -> &mut Self::Output {
         &mut self.values[(x * self.y + y) as usize]
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum BlockType {
+    None,
+    One,
+    Two,
+}
+
+struct BlockMap {
+    size: usize,
+    map: Grid<BlockType>,
+    positions_one: Vec<Vector>,
+    positions_two: Vec<Vector>,
+}
+
+impl BlockMap {
+    fn new(size: usize) -> Self {
+        Self {
+            size,
+            map: Grid::new(size, size, BlockType::None),
+            positions_one: Vec::new(),
+            positions_two: Vec::new(),
+        }
+    }
+
+    fn init(&mut self) {
+        for i in 0..self.size {
+            for j in 0..self.size {
+                if i % 3 == 0 {
+                    self.map[(i, j)] = match j % 8 {
+                        6 | 0 => {
+                            self.positions_one.push(Vector::new(i as i32, j as i32));
+                            BlockType::One
+                        }
+                        _ => BlockType::None,
+                    };
+                } else if i % 3 == 1 {
+                    self.map[(i, j)] = match j % 8 {
+                        6 | 0 => {
+                            self.positions_two.push(Vector::new(i as i32, j as i32));
+                            BlockType::Two
+                        }
+                        _ => BlockType::None,
+                    }
+                } else {
+                    self.map[(i, j)] = match j % 8 {
+                        6 | 7 | 0 => BlockType::None,
+                        _ => {
+                            self.positions_one.push(Vector::new(i as i32, j as i32));
+                            BlockType::One
+                        }
+                    };
+                }
+            }
+        }
+
+        for i in 0..self.size {
+            self.map[(i, 0)] = BlockType::One;
+            self.map[(i, self.size - 1)] = BlockType::One;
+            self.map[(0, i)] = BlockType::One;
+            self.map[(self.size - 1, i)] = BlockType::One;
+        }
     }
 }
