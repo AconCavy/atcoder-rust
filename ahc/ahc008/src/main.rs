@@ -71,11 +71,7 @@ fn main() {
     for _ in 0..TURN {
         grid.update(&humans, &pets);
 
-        let mut answer = vec!['.'; m];
-        for (i, human) in humans.iter_mut().enumerate() {
-            answer[i] = human.act(&mut grid);
-        }
-
+        let answer: Vec<_> = humans.iter_mut().map(|x| x.act(&mut grid)).collect();
         println!("{}", answer.into_iter().join(""));
 
         input! {
