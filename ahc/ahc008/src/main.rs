@@ -53,23 +53,24 @@ fn main() {
     }
 
     let mut humans = Vec::with_capacity(m);
-    for i in 0..m {
+    for _ in 0..m {
         input! {
             from &mut source,
             hx: i32,
             hy: i32,
         }
 
-        let div = m.min(6) as i32;
-        let ax = GRID_MAX / div * (i as i32 % div) + 1;
-        let ay = GRID_MAX / 2;
-        humans.push(Human::new(hx, hy, ax, ay));
+        humans.push(Human::new(hx, hy));
     }
 
-    let mut block_map = BlockMap::new(GRID_SIZE);
-    block_map.init();
+    let mut blocks = Vec::with_capacity(GRID_SIZE * GRID_SIZE);
+    for i in 0..GRID_SIZE {
+        for j in 0..GRID_SIZE {
+            blocks.push(Block::new_by_rule(i as i32, j as i32));
+        }
+    }
 
-    let mut world = World::new(GRID_SIZE, humans, pets, block_map);
+    let mut world = World::new(GRID_SIZE, humans, pets, blocks);
     world.init();
 
     for _ in 0..TURN {
@@ -103,16 +104,6 @@ impl Direction {
         Direction::Left,
         Direction::Right,
     ];
-
-    fn inverse(&self) -> Direction {
-        match self {
-            Direction::None => Direction::None,
-            Direction::Up => Direction::Down,
-            Direction::Down => Direction::Up,
-            Direction::Left => Direction::Right,
-            Direction::Right => Direction::Left,
-        }
-    }
 
     fn to_vector(&self) -> Vector {
         match self {
@@ -214,9 +205,9 @@ impl Pet {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum HumanState {
-    Setup1,
+    SetupOne,
     BlockOne,
-    Setup2,
+    SetupTwo,
     BlockTwo,
 }
 
@@ -224,15 +215,13 @@ enum HumanState {
 struct Human {
     position: Vector,
     state: HumanState,
-    axis: Vector,
 }
 
 impl Human {
-    fn new(x: i32, y: i32, ax: i32, ay: i32) -> Self {
+    fn new(x: i32, y: i32) -> Self {
         Self {
             position: Vector::new(x, y),
-            state: HumanState::Setup1,
-            axis: Vector::new(ax, ay),
+            state: HumanState::SetupOne,
         }
     }
 }
@@ -241,7 +230,7 @@ struct World {
     size: usize,
     humans: Vec<Human>,
     pets: Vec<Pet>,
-    block_map: BlockMap,
+    blocks: Vec<Block>,
     human_exists: Grid<bool>,
     pet_exists: Grid<bool>,
     block_exists: Grid<bool>,
@@ -249,18 +238,14 @@ struct World {
 }
 
 impl World {
-    const INVALID_I32: i32 = -1;
-    const INVALID_VECTOR: Vector = Vector {
-        x: Self::INVALID_I32,
-        y: Self::INVALID_I32,
-    };
+    const INVALID_DISTANCE: i32 = -1;
 
-    fn new(size: usize, humans: Vec<Human>, pets: Vec<Pet>, block_map: BlockMap) -> Self {
+    fn new(size: usize, humans: Vec<Human>, pets: Vec<Pet>, blocks: Vec<Block>) -> Self {
         Self {
             size,
             humans,
             pets,
-            block_map,
+            blocks,
             human_exists: Grid::new(size, size, false),
             pet_exists: Grid::new(size, size, false),
             block_exists: Grid::new(size, size, false),
@@ -280,12 +265,12 @@ impl World {
     fn update(&mut self) {
         self.human_exists.fill(false);
         for position in self.humans.iter().map(|x| x.position) {
-            self.human_exists[&position] = true;
+            self.human_exists[position] = true;
         }
 
         self.pet_exists.fill(false);
         for position in self.pets.iter().map(|x| x.position) {
-            self.pet_exists[&position] = true;
+            self.pet_exists[position] = true;
         }
 
         let targets = self.pets.iter().map(|x| x.position).collect_vec();
@@ -296,9 +281,9 @@ impl World {
         let mut result = vec!['.'; self.humans.len()];
         for i in 0..self.humans.len() {
             result[i] = match self.humans[i].state {
-                HumanState::Setup1 => self.act_setup1(i),
+                HumanState::SetupOne => self.act_setup_one(i),
                 HumanState::BlockOne => self.act_block_one(i),
-                HumanState::Setup2 => self.act_setup2(i),
+                HumanState::SetupTwo => self.act_setup_two(i),
                 HumanState::BlockTwo => self.act_block_two(i),
             };
         }
@@ -306,7 +291,7 @@ impl World {
         result
     }
 
-    fn act_setup1(&mut self, idx: usize) -> char {
+    fn act_setup_one(&mut self, idx: usize) -> char {
         let x = 6 * (idx as i32 % 5) + 3;
         let y = if self.humans[idx].position.y < self.size as i32 / 2 {
             0
@@ -314,7 +299,7 @@ impl World {
             30
         };
         let position = Vector::new(x, y);
-        match self.approach_to(idx, &position) {
+        match self.approach_to(idx, position) {
             None => {
                 self.humans[idx].state = HumanState::BlockOne;
                 '.'
@@ -323,11 +308,11 @@ impl World {
         }
     }
 
-    fn act_setup2(&mut self, idx: usize) -> char {
+    fn act_setup_two(&mut self, idx: usize) -> char {
         let x = self.humans[idx].position.x;
         let y = 10 * (idx as i32 % 2 + 1);
         let position = Vector::new(x, y);
-        match self.approach_to(idx, &position) {
+        match self.approach_to(idx, position) {
             None => {
                 self.humans[idx].state = HumanState::BlockTwo;
                 '.'
@@ -340,7 +325,7 @@ impl World {
         if distance == 0 {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.humans[idx].position.neighbor(*direction);
-                if self.is_valid(&np) && self.get_distance(&distances, &np) > distance {
+                if self.is_valid(np) && self.get_distance(&distances, np) > distance {
                     if let Some(result) = self.move_to(idx, *direction) {
                         return result;
                     }
@@ -349,7 +334,7 @@ impl World {
         } else if distance == 1 {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.humans[idx].position.neighbor(*direction);
-                if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+                if self.is_valid(np) && self.get_distance(&distances, np) < distance {
                     if let Some(result) = self.block(idx, *direction) {
                         return result;
                     }
@@ -358,7 +343,7 @@ impl World {
         } else {
             for direction in Direction::DIRECTION4.iter() {
                 let np = self.humans[idx].position.neighbor(*direction);
-                if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+                if self.is_valid(np) && self.get_distance(&distances, np) < distance {
                     if let Some(result) = self.move_to(idx, *direction) {
                         return result;
                     }
@@ -370,18 +355,23 @@ impl World {
     }
 
     fn act_block_one(&mut self, idx: usize) -> char {
+        let filter_block_one = |block: &Block| match block.block_type {
+            BlockType::One => true,
+            _ => false,
+        };
+
         let target: Vec<_> = self
-            .block_map
-            .positions_one
+            .blocks
             .iter()
+            .filter(|x| filter_block_one(x))
+            .map(|x| x.position)
             .filter(|x| !self.block_exists[*x])
-            .map(|x| x.clone())
             .collect();
 
         let distances = self.calc_distances(&target);
-        let distance = self.get_distance(&distances, &self.humans[idx].position);
-        if distance == Self::INVALID_I32 || distance > 20 {
-            self.humans[idx].state = HumanState::Setup2;
+        let distance = self.get_distance(&distances, self.humans[idx].position);
+        if distance == Self::INVALID_DISTANCE || distance > 20 {
+            self.humans[idx].state = HumanState::SetupTwo;
             return '.';
         }
 
@@ -389,49 +379,37 @@ impl World {
     }
 
     fn act_block_two(&mut self, idx: usize) -> char {
-        let exists_left = |position: &Vector, block_position: &Vector| -> bool {
-            block_position.y - 9 <= position.y
-                && position.y <= block_position.y
-                && block_position.x - 1 <= position.x
-                && position.x <= block_position.x
+        let filter_block_two = |block: &Block| match block.block_type {
+            BlockType::TwoL | BlockType::TwoR => true,
+            _ => false,
         };
 
-        let exists_right = |position: &Vector, block_position: &Vector| -> bool {
-            block_position.y <= position.y
-                && position.y <= block_position.y + 9
-                && block_position.x - 1 <= position.x
-                && position.x <= block_position.x
-        };
+        let filter_by_y =
+            |human: Vector, block: Vector| human.y - 2 <= block.y && block.y <= human.y + 2;
 
         let target: Vec<_> = self
-            .block_map
-            .positions_two
+            .blocks
             .iter()
-            .filter(|position| {
-                !self.block_exists[*position]
-                    && self.humans[idx].position.y - 2 <= position.y
-                    && position.y <= self.humans[idx].position.y + 2
-                    && self.pets.iter().any(|x| {
-                        if position.y % 11 == 9 {
-                            exists_left(&x.position, position)
-                        } else {
-                            exists_right(&x.position, position)
-                        }
-                    })
-                    && self.humans.iter().all(|x| {
-                        if position.y % 11 == 9 {
-                            !exists_left(&x.position, position)
-                        } else {
-                            !exists_right(&x.position, position)
-                        }
-                    })
+            .filter(|block| {
+                filter_block_two(block)
+                    && !self.block_exists[block.position]
+                    && filter_by_y(self.humans[idx].position, block.position)
+                    && self
+                        .pets
+                        .iter()
+                        .any(|x| block.is_targeted_by_rule(x.position))
+                    && self
+                        .humans
+                        .iter()
+                        .all(|x| !block.is_targeted_by_rule(x.position))
             })
-            .map(|x| x.clone())
+            .map(|x| x.position)
+            .filter(|x| !self.block_exists[*x])
             .collect();
 
         let distances = self.calc_distances(&target);
-        let distance = self.get_distance(&distances, &self.humans[idx].position);
-        if distance == Self::INVALID_I32 {
+        let distance = self.get_distance(&distances, self.humans[idx].position);
+        if distance == Self::INVALID_DISTANCE {
             return '.';
         }
 
@@ -445,17 +423,17 @@ impl World {
     }
 
     fn calc_distances(&self, positions: &[Vector]) -> Grid<i32> {
-        let mut distance = Grid::new(self.size, self.size, World::INVALID_I32);
+        let mut distance = Grid::new(self.size, self.size, World::INVALID_DISTANCE);
         let mut queue: VecDeque<Vector> = VecDeque::new();
         for position in positions {
-            distance[position] = 0;
+            distance[*position] = 0;
             queue.push_back(position.clone());
         }
 
         while let Some(cp) = queue.pop_front() {
             for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(*x)) {
-                if self.is_movable(&np) && distance[&np] == Self::INVALID_I32 {
-                    distance[&np] = distance[&cp] + 1;
+                if self.is_movable(np) && distance[np] == Self::INVALID_DISTANCE {
+                    distance[np] = distance[cp] + 1;
                     queue.push_back(np);
                 }
             }
@@ -464,26 +442,26 @@ impl World {
         distance
     }
 
-    fn get_distance(&self, grid: &Grid<i32>, position: &Vector) -> i32 {
-        if self.is_valid(&position) {
+    fn get_distance(&self, grid: &Grid<i32>, position: Vector) -> i32 {
+        if self.is_valid(position) {
             grid[position]
         } else {
-            World::INVALID_I32
+            World::INVALID_DISTANCE
         }
     }
 
-    fn is_valid(&self, position: &Vector) -> bool {
+    fn is_valid(&self, position: Vector) -> bool {
         0 <= position.x
             && position.x < self.size as i32
             && 0 <= position.y
             && position.y < self.size as i32
     }
 
-    fn is_movable(&self, position: &Vector) -> bool {
+    fn is_movable(&self, position: Vector) -> bool {
         self.is_valid(position) && !self.block_exists[position]
     }
 
-    fn is_blockable(&self, position: &Vector) -> bool {
+    fn is_blockable(&self, position: Vector) -> bool {
         if !self.is_valid(position)
             || self.block_exists[position]
             || self.human_exists[position]
@@ -493,7 +471,7 @@ impl World {
         }
 
         for np in Direction::DIRECTION4.iter().map(|x| position.neighbor(*x)) {
-            if self.is_valid(&np) && self.pet_exists[&np] {
+            if self.is_valid(np) && self.pet_exists[np] {
                 return false;
             }
         }
@@ -503,8 +481,8 @@ impl World {
 
     fn move_to(&mut self, idx: usize, direction: Direction) -> Option<char> {
         let position = self.humans[idx].position.neighbor(direction);
-        return if self.is_movable(&position) {
-            self.human_exists[&position] = true;
+        return if self.is_movable(position) {
+            self.human_exists[position] = true;
             self.humans[idx].position = position;
             Some(direction.to_char())
         } else {
@@ -514,24 +492,24 @@ impl World {
 
     fn block(&mut self, idx: usize, direction: Direction) -> Option<char> {
         let position = self.humans[idx].position.neighbor(direction);
-        return if self.is_blockable(&position) {
-            self.block_exists[&position] = true;
+        return if self.is_blockable(position) {
+            self.block_exists[position] = true;
             Some(direction.to_char().to_ascii_lowercase())
         } else {
             None
         };
     }
 
-    fn approach_to(&mut self, idx: usize, position: &Vector) -> Option<char> {
-        let distances = self.calc_distances(&vec![position.clone()]);
-        let distance = self.get_distance(&distances, &self.humans[idx].position);
-        if distance == World::INVALID_I32 {
+    fn approach_to(&mut self, idx: usize, position: Vector) -> Option<char> {
+        let distances = self.calc_distances(&vec![position]);
+        let distance = self.get_distance(&distances, self.humans[idx].position);
+        if distance == World::INVALID_DISTANCE {
             return None;
         }
 
         for direction in Direction::DIRECTION4.iter() {
             let np = self.humans[idx].position.neighbor(*direction);
-            if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+            if self.is_valid(np) && self.get_distance(&distances, np) < distance {
                 if let Some(result) = self.move_to(idx, *direction) {
                     return Some(result);
                 }
@@ -539,14 +517,6 @@ impl World {
         }
 
         None
-    }
-
-    fn get_movable_min(&self) -> i32 {
-        1
-    }
-
-    fn get_movable_max(&self) -> i32 {
-        self.size as i32 - 2
     }
 }
 
@@ -578,16 +548,16 @@ where
     }
 }
 
-impl<T: std::clone::Clone> Index<&Vector> for Grid<T> {
+impl<T: std::clone::Clone> Index<Vector> for Grid<T> {
     type Output = T;
 
-    fn index(&self, index: &Vector) -> &Self::Output {
+    fn index(&self, index: Vector) -> &Self::Output {
         &self.values[index.x as usize * self.y + index.y as usize]
     }
 }
 
-impl<T: std::clone::Clone> IndexMut<&Vector> for Grid<T> {
-    fn index_mut(&mut self, index: &Vector) -> &mut Self::Output {
+impl<T: std::clone::Clone> IndexMut<Vector> for Grid<T> {
+    fn index_mut(&mut self, index: Vector) -> &mut Self::Output {
         &mut self.values[index.x as usize * self.y + index.y as usize]
     }
 }
@@ -610,62 +580,60 @@ impl<T: std::clone::Clone> IndexMut<(usize, usize)> for Grid<T> {
 enum BlockType {
     None,
     One,
-    Two,
+    TwoL,
+    TwoR,
 }
 
-struct BlockMap {
-    size: usize,
-    map: Grid<BlockType>,
-    positions_one: Vec<Vector>,
-    positions_two: Vec<Vector>,
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+struct Block {
+    position: Vector,
+    block_type: BlockType,
 }
 
-impl BlockMap {
-    fn new(size: usize) -> Self {
+impl Block {
+    fn new(x: i32, y: i32, block_type: BlockType) -> Self {
         Self {
-            size,
-            map: Grid::new(size, size, BlockType::None),
-            positions_one: Vec::new(),
-            positions_two: Vec::new(),
+            position: Vector { x, y },
+            block_type,
         }
     }
 
-    fn init(&mut self) {
-        for i in 0..self.size {
-            for j in 0..self.size {
-                if i % 3 == 0 {
-                    self.map[(i, j)] = match j % 11 {
-                        9 | 0 => {
-                            self.positions_one.push(Vector::new(i as i32, j as i32));
-                            BlockType::One
-                        }
-                        _ => BlockType::None,
-                    };
-                } else if i % 3 == 1 {
-                    self.map[(i, j)] = match j % 11 {
-                        9 | 0 => {
-                            self.positions_two.push(Vector::new(i as i32, j as i32));
-                            BlockType::Two
-                        }
-                        _ => BlockType::None,
-                    }
-                } else {
-                    self.map[(i, j)] = match j % 11 {
-                        9 | 10 | 0 => BlockType::None,
-                        _ => {
-                            self.positions_one.push(Vector::new(i as i32, j as i32));
-                            BlockType::One
-                        }
-                    };
-                }
+    fn new_by_rule(x: i32, y: i32) -> Self {
+        if x % 3 == 0 {
+            match y % 11 {
+                9 | 0 => Block::new(x, y, BlockType::One),
+                _ => Block::new(x, y, BlockType::None),
+            }
+        } else if x % 3 == 1 {
+            match y % 11 {
+                9 => Block::new(x, y, BlockType::TwoR),
+                0 => Block::new(x, y, BlockType::TwoL),
+                _ => Block::new(x, y, BlockType::None),
+            }
+        } else {
+            match y % 11 {
+                9 | 10 | 0 => Block::new(x, y, BlockType::None),
+                _ => Block::new(x, y, BlockType::One),
             }
         }
+    }
 
-        for i in 0..self.size {
-            self.map[(i, 0)] = BlockType::One;
-            self.map[(i, self.size - 1)] = BlockType::One;
-            self.map[(0, i)] = BlockType::One;
-            self.map[(self.size - 1, i)] = BlockType::One;
+    fn is_targeted_by_rule(&self, target: Vector) -> bool {
+        match self.block_type {
+            BlockType::None => false,
+            BlockType::One => true,
+            BlockType::TwoL => {
+                self.position.y <= target.y
+                    && target.y <= self.position.y + 9
+                    && self.position.x - 1 <= target.x
+                    && target.x <= self.position.x
+            }
+            BlockType::TwoR => {
+                self.position.y - 9 <= target.y
+                    && target.y <= self.position.y
+                    && self.position.x - 1 <= target.x
+                    && target.x <= self.position.x
+            }
         }
     }
 }
