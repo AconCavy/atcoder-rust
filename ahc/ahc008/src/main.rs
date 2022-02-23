@@ -157,7 +157,7 @@ impl Vector {
         Self { x, y }
     }
 
-    fn translate(&mut self, v: &Vector) {
+    fn translate(&mut self, v: Vector) {
         self.x += v.x;
         self.y += v.y;
     }
@@ -192,13 +192,6 @@ impl Pet {
         Self {
             position: Vector { x, y },
             pet_type,
-        }
-    }
-
-    fn act(&mut self, action: &[char]) {
-        for c in action {
-            self.position
-                .translate(&Direction::from_char(*c).to_vector());
         }
     }
 }
@@ -418,7 +411,9 @@ impl World {
 
     fn act_pets(&mut self, actions: &[Vec<char>]) {
         for (pet, action) in self.pets.iter_mut().zip(actions.iter()) {
-            pet.act(action);
+            for c in action {
+                pet.position.translate(Direction::from_char(*c).to_vector());
+            }
         }
     }
 
