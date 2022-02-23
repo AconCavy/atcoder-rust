@@ -307,7 +307,7 @@ impl World {
     }
 
     fn act_setup1(&mut self, idx: usize) -> char {
-        let x = 5 * (idx as i32 % 6 + 1) + 1;
+        let x = 6 * (idx as i32 % 5) + 3;
         let y = if self.humans[idx].position.y < self.size as i32 / 2 {
             0
         } else {
@@ -325,7 +325,7 @@ impl World {
 
     fn act_setup2(&mut self, idx: usize) -> char {
         let x = self.humans[idx].position.x;
-        let y = (8 * (idx % 3 + 1) - 1) as i32;
+        let y = 10 * (idx as i32 % 2 + 1);
         let position = Vector::new(x, y);
         match self.approach_to(idx, &position) {
             None => {
@@ -389,18 +389,18 @@ impl World {
     }
 
     fn act_block_two(&mut self, idx: usize) -> char {
-        let exists_left = |pet_position: &Vector, block_position: &Vector| -> bool {
-            block_position.y - 5 <= pet_position.y
-                && pet_position.y <= block_position.y
-                && block_position.x - 1 <= pet_position.x
-                && pet_position.x <= block_position.x
+        let exists_left = |position: &Vector, block_position: &Vector| -> bool {
+            block_position.y - 9 <= position.y
+                && position.y <= block_position.y
+                && block_position.x - 1 <= position.x
+                && position.x <= block_position.x
         };
 
-        let exists_right = |pet_position: &Vector, block_position: &Vector| -> bool {
-            block_position.y <= pet_position.y
-                && pet_position.y <= block_position.y + 5
-                && block_position.x - 1 <= pet_position.x
-                && pet_position.x <= block_position.x
+        let exists_right = |position: &Vector, block_position: &Vector| -> bool {
+            block_position.y <= position.y
+                && position.y <= block_position.y + 9
+                && block_position.x - 1 <= position.x
+                && position.x <= block_position.x
         };
 
         let target: Vec<_> = self
@@ -411,11 +411,18 @@ impl World {
                 !self.block_exists[*position]
                     && self.humans[idx].position.y - 2 <= position.y
                     && position.y <= self.humans[idx].position.y + 2
-                    && self.pets.iter().any(|pet| {
-                        if position.y % 8 == 6 {
-                            exists_left(&pet.position, position)
+                    && self.pets.iter().any(|x| {
+                        if position.y % 11 == 9 {
+                            exists_left(&x.position, position)
                         } else {
-                            exists_right(&pet.position, position)
+                            exists_right(&x.position, position)
+                        }
+                    })
+                    && self.humans.iter().all(|x| {
+                        if position.y % 11 == 9 {
+                            !exists_left(&x.position, position)
+                        } else {
+                            !exists_right(&x.position, position)
                         }
                     })
             })
@@ -627,24 +634,24 @@ impl BlockMap {
         for i in 0..self.size {
             for j in 0..self.size {
                 if i % 3 == 0 {
-                    self.map[(i, j)] = match j % 8 {
-                        6 | 0 => {
+                    self.map[(i, j)] = match j % 11 {
+                        9 | 0 => {
                             self.positions_one.push(Vector::new(i as i32, j as i32));
                             BlockType::One
                         }
                         _ => BlockType::None,
                     };
                 } else if i % 3 == 1 {
-                    self.map[(i, j)] = match j % 8 {
-                        6 | 0 => {
+                    self.map[(i, j)] = match j % 11 {
+                        9 | 0 => {
                             self.positions_two.push(Vector::new(i as i32, j as i32));
                             BlockType::Two
                         }
                         _ => BlockType::None,
                     }
                 } else {
-                    self.map[(i, j)] = match j % 8 {
-                        6 | 7 | 0 => BlockType::None,
+                    self.map[(i, j)] = match j % 11 {
+                        9 | 10 | 0 => BlockType::None,
                         _ => {
                             self.positions_one.push(Vector::new(i as i32, j as i32));
                             BlockType::One
