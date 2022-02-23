@@ -69,13 +69,13 @@ fn main() {
     let mut block_map = BlockMap::new(GRID_SIZE);
     block_map.init();
 
-    let mut world = World::new(GRID_SIZE, block_map);
+    let mut world = World::new(GRID_SIZE, humans, pets, block_map);
     world.init();
 
     for _ in 0..TURN {
-        world.update(&humans, &pets);
+        world.update();
 
-        let answer: Vec<_> = humans.iter_mut().map(|x| x.act(&mut world)).collect();
+        let answer: Vec<_> = world.act_humans();
         println!("{}", answer.into_iter().join(""));
 
         input! {
@@ -83,9 +83,7 @@ fn main() {
             actions: [Chars; n]
         }
 
-        for (pet, action) in pets.iter_mut().zip(actions.into_iter()) {
-            pet.act(&action);
-        }
+        world.act_pets(&actions);
     }
 }
 
@@ -173,7 +171,7 @@ impl Vector {
         self.y += v.y;
     }
 
-    fn neighbor(&self, direction: &Direction) -> Vector {
+    fn neighbor(&self, direction: Direction) -> Vector {
         let v = direction.to_vector();
         Self {
             x: self.x + v.x,
@@ -217,9 +215,9 @@ impl Pet {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum HumanState {
     Setup1,
-    Wall,
+    BlockOne,
     Setup2,
-    Block,
+    BlockTwo,
 }
 
 #[derive(Debug, Clone)]
@@ -237,169 +235,17 @@ impl Human {
             axis: Vector::new(ax, ay),
         }
     }
-
-    fn act(&mut self, world: &mut World) -> char {
-        match self.state {
-            HumanState::Setup1 => self.act_setup1(world),
-            HumanState::Wall => self.act_wall(world),
-            HumanState::Setup2 => self.act_setup2(world),
-            HumanState::Block => self.act_block(world),
-        }
-    }
-
-    fn act_setup1(&mut self, grid: &mut World) -> char {
-        let position = Vector::new(self.axis.x, grid.get_movable_min());
-        match self.try_approach_to(grid, &position) {
-            None => {
-                self.state = HumanState::Wall;
-                '.'
-            }
-            Some(result) => result,
-        }
-    }
-
-    fn act_wall(&mut self, world: &mut World) -> char {
-        let d = 2;
-        if self.axis.y - d <= self.position.y && self.position.y <= self.axis.y + d {
-            return match self.try_move_to(world, &Direction::Right) {
-                None => '.',
-                Some(result) => result,
-            };
-        }
-
-        let up = self.position.neighbor(&Direction::Up);
-        return if world.block_exists[&up] {
-            let end = Vector::new(self.axis.x, world.get_movable_max());
-            if self.position == end {
-                self.state = HumanState::Setup2;
-                return '.';
-            }
-
-            match self.try_move_to(world, &Direction::Right) {
-                None => '.',
-                Some(result) => result,
-            }
-        } else {
-            match self.try_block(world, &Direction::Up) {
-                None => '.',
-                Some(result) => result,
-            }
-        };
-    }
-
-    fn act_setup2(&mut self, world: &mut World) -> char {
-        let position = self.axis.clone();
-        match self.try_approach_to(world, &position) {
-            None => {
-                self.state = HumanState::Block;
-                '.'
-            }
-            Some(result) => result,
-        }
-    }
-
-    fn act_block(&mut self, world: &mut World) -> char {
-        let distance = world.get_distance(&self.position);
-        if distance == World::INVALID_I32 {
-            return '.';
-        }
-
-        if distance > 5 {
-            for direction in Direction::DIRECTION4.iter() {
-                let np = self.position.neighbor(&direction);
-                if world.is_valid(&np) && world.get_distance(&np) < distance {
-                    if let Some(result) = self.try_move_to(world, &direction) {
-                        return result;
-                    }
-                }
-            }
-        } else if distance > 2 {
-            let blocked = Direction::DIRECTION4
-                .iter()
-                .map(|x| self.position.neighbor(x))
-                .filter(|v| world.block_exists[v])
-                .count();
-
-            if blocked < 2 {
-                for direction in Direction::DIRECTION4.iter() {
-                    let np = self.position.neighbor(&direction);
-                    if world.is_valid(&np) && world.get_distance(&np) < distance {
-                        if let Some(result) = self.try_block(world, &direction) {
-                            return result;
-                        }
-                    }
-                }
-            }
-        }
-
-        for direction in Direction::DIRECTION4.iter() {
-            let np = self.position.neighbor(&direction);
-            if world.is_valid(&np) && world.get_distance(&np) > distance {
-                if let Some(result) = self.try_move_to(world, &direction) {
-                    return result;
-                }
-            }
-        }
-        '.'
-    }
-
-    fn try_approach_to(&mut self, world: &mut World, position: &Vector) -> Option<char> {
-        let distances = world.calc_distance(&vec![position.clone()]);
-
-        let get_distance = |grid: &World, position: &Vector| -> i32 {
-            if grid.is_valid(&position) {
-                distances[position]
-            } else {
-                World::INVALID_I32
-            }
-        };
-
-        let distance = get_distance(world, &self.position);
-        if distance == World::INVALID_I32 {
-            return None;
-        }
-
-        for direction in Direction::DIRECTION4.iter() {
-            let np = self.position.neighbor(&direction);
-            if world.is_valid(&np) && get_distance(world, &np) < distance {
-                if let Some(result) = self.try_move_to(world, &direction) {
-                    return Some(result);
-                }
-            }
-        }
-
-        None
-    }
-
-    fn try_move_to(&mut self, grid: &mut World, direction: &Direction) -> Option<char> {
-        let position = self.position.neighbor(&direction);
-        return if grid.is_movable(&position) {
-            grid.move_to(&position);
-            self.position = position;
-            Some(direction.to_char())
-        } else {
-            None
-        };
-    }
-
-    fn try_block(&self, grid: &mut World, direction: &Direction) -> Option<char> {
-        let position = self.position.neighbor(&direction);
-        return if grid.is_blockable(&position) {
-            grid.block(&position);
-            Some(direction.to_char().to_ascii_lowercase())
-        } else {
-            None
-        };
-    }
 }
 
 struct World {
     size: usize,
+    humans: Vec<Human>,
+    pets: Vec<Pet>,
     block_map: BlockMap,
     human_exists: Grid<bool>,
     pet_exists: Grid<bool>,
     block_exists: Grid<bool>,
-    distances: Grid<i32>,
+    distances_from_pets: Grid<i32>,
 }
 
 impl World {
@@ -409,14 +255,16 @@ impl World {
         y: Self::INVALID_I32,
     };
 
-    fn new(size: usize, block_map: BlockMap) -> Self {
+    fn new(size: usize, humans: Vec<Human>, pets: Vec<Pet>, block_map: BlockMap) -> Self {
         Self {
             size,
+            humans,
+            pets,
             block_map,
             human_exists: Grid::new(size, size, false),
             pet_exists: Grid::new(size, size, false),
             block_exists: Grid::new(size, size, false),
-            distances: Grid::new(size, size, 0),
+            distances_from_pets: Grid::new(size, size, 0),
         }
     }
 
@@ -429,29 +277,167 @@ impl World {
         }
     }
 
-    fn update(&mut self, humans: &[Human], pets: &[Pet]) {
-        self.update_human_exists(humans);
-        self.update_pet_exists(pets);
-
-        let targets = pets.iter().map(|x| x.position).collect_vec();
-        self.distances = self.calc_distance(&targets);
-    }
-
-    fn update_human_exists(&mut self, humans: &[Human]) {
-        self.human_exists = Grid::new(self.size, self.size, false);
-        for position in humans.iter().map(|x| x.position) {
+    fn update(&mut self) {
+        self.human_exists.fill(false);
+        for position in self.humans.iter().map(|x| x.position) {
             self.human_exists[&position] = true;
         }
+
+        self.pet_exists.fill(false);
+        for position in self.pets.iter().map(|x| x.position) {
+            self.pet_exists[&position] = true;
+        }
+
+        let targets = self.pets.iter().map(|x| x.position).collect_vec();
+        self.distances_from_pets = self.calc_distances(&targets);
     }
 
-    fn update_pet_exists(&mut self, pets: &[Pet]) {
-        self.pet_exists = Grid::new(self.size, self.size, false);
-        for position in pets.iter().map(|x| x.position) {
-            self.pet_exists[&position] = true;
+    fn act_humans(&mut self) -> Vec<char> {
+        let mut result = vec!['.'; self.humans.len()];
+        for i in 0..self.humans.len() {
+            result[i] = match self.humans[i].state {
+                HumanState::Setup1 => self.act_setup1(i),
+                HumanState::BlockOne => self.act_block_one(i),
+                HumanState::Setup2 => self.act_setup2(i),
+                HumanState::BlockTwo => self.act_block_two(i),
+            };
+        }
+
+        result
+    }
+
+    fn act_setup1(&mut self, idx: usize) -> char {
+        let x = 5 * (idx as i32 % 6 + 1) + 1;
+        let y = if self.humans[idx].position.y < self.size as i32 / 2 {
+            0
+        } else {
+            30
+        };
+        let position = Vector::new(x, y);
+        match self.approach_to(idx, &position) {
+            None => {
+                self.humans[idx].state = HumanState::BlockOne;
+                '.'
+            }
+            Some(result) => result,
         }
     }
 
-    fn calc_distance(&self, positions: &[Vector]) -> Grid<i32> {
+    fn act_setup2(&mut self, idx: usize) -> char {
+        let x = self.humans[idx].position.x;
+        let y = (8 * (idx % 3 + 1) - 1) as i32;
+        let position = Vector::new(x, y);
+        match self.approach_to(idx, &position) {
+            None => {
+                self.humans[idx].state = HumanState::BlockTwo;
+                '.'
+            }
+            Some(result) => result,
+        }
+    }
+
+    fn act_block(&mut self, idx: usize, distances: &Grid<i32>, distance: i32) -> char {
+        if distance == 0 {
+            for direction in Direction::DIRECTION4.iter() {
+                let np = self.humans[idx].position.neighbor(*direction);
+                if self.is_valid(&np) && self.get_distance(&distances, &np) > distance {
+                    if let Some(result) = self.move_to(idx, *direction) {
+                        return result;
+                    }
+                }
+            }
+        } else if distance == 1 {
+            for direction in Direction::DIRECTION4.iter() {
+                let np = self.humans[idx].position.neighbor(*direction);
+                if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+                    if let Some(result) = self.block(idx, *direction) {
+                        return result;
+                    }
+                }
+            }
+        } else {
+            for direction in Direction::DIRECTION4.iter() {
+                let np = self.humans[idx].position.neighbor(*direction);
+                if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+                    if let Some(result) = self.move_to(idx, *direction) {
+                        return result;
+                    }
+                }
+            }
+        }
+
+        '.'
+    }
+
+    fn act_block_one(&mut self, idx: usize) -> char {
+        let target: Vec<_> = self
+            .block_map
+            .positions_one
+            .iter()
+            .filter(|x| !self.block_exists[*x])
+            .map(|x| x.clone())
+            .collect();
+
+        let distances = self.calc_distances(&target);
+        let distance = self.get_distance(&distances, &self.humans[idx].position);
+        if distance == Self::INVALID_I32 || distance > 20 {
+            self.humans[idx].state = HumanState::Setup2;
+            return '.';
+        }
+
+        self.act_block(idx, &distances, distance)
+    }
+
+    fn act_block_two(&mut self, idx: usize) -> char {
+        let exists_left = |pet_position: &Vector, block_position: &Vector| -> bool {
+            block_position.y - 5 <= pet_position.y
+                && pet_position.y <= block_position.y
+                && block_position.x - 1 <= pet_position.x
+                && pet_position.x <= block_position.x
+        };
+
+        let exists_right = |pet_position: &Vector, block_position: &Vector| -> bool {
+            block_position.y <= pet_position.y
+                && pet_position.y <= block_position.y + 5
+                && block_position.x - 1 <= pet_position.x
+                && pet_position.x <= block_position.x
+        };
+
+        let target: Vec<_> = self
+            .block_map
+            .positions_two
+            .iter()
+            .filter(|position| {
+                !self.block_exists[*position]
+                    && self.humans[idx].position.y - 2 <= position.y
+                    && position.y <= self.humans[idx].position.y + 2
+                    && self.pets.iter().any(|pet| {
+                        if position.y % 8 == 6 {
+                            exists_left(&pet.position, position)
+                        } else {
+                            exists_right(&pet.position, position)
+                        }
+                    })
+            })
+            .map(|x| x.clone())
+            .collect();
+
+        let distances = self.calc_distances(&target);
+        let distance = self.get_distance(&distances, &self.humans[idx].position);
+        if distance == Self::INVALID_I32 {
+            return '.';
+        }
+
+        self.act_block(idx, &distances, distance)
+    }
+
+    fn act_pets(&mut self, actions: &[Vec<char>]) {
+        for (pet, action) in self.pets.iter_mut().zip(actions.iter()) {
+            pet.act(action);
+        }
+    }
+
+    fn calc_distances(&self, positions: &[Vector]) -> Grid<i32> {
         let mut distance = Grid::new(self.size, self.size, World::INVALID_I32);
         let mut queue: VecDeque<Vector> = VecDeque::new();
         for position in positions {
@@ -460,7 +446,7 @@ impl World {
         }
 
         while let Some(cp) = queue.pop_front() {
-            for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(x)) {
+            for np in Direction::DIRECTION4.iter().map(|x| cp.neighbor(*x)) {
                 if self.is_movable(&np) && distance[&np] == Self::INVALID_I32 {
                     distance[&np] = distance[&cp] + 1;
                     queue.push_back(np);
@@ -469,6 +455,14 @@ impl World {
         }
 
         distance
+    }
+
+    fn get_distance(&self, grid: &Grid<i32>, position: &Vector) -> i32 {
+        if self.is_valid(&position) {
+            grid[position]
+        } else {
+            World::INVALID_I32
+        }
     }
 
     fn is_valid(&self, position: &Vector) -> bool {
@@ -491,7 +485,7 @@ impl World {
             return false;
         }
 
-        for np in Direction::DIRECTION4.iter().map(|x| position.neighbor(x)) {
+        for np in Direction::DIRECTION4.iter().map(|x| position.neighbor(*x)) {
             if self.is_valid(&np) && self.pet_exists[&np] {
                 return false;
             }
@@ -500,24 +494,44 @@ impl World {
         true
     }
 
-    fn get_distance(&self, position: &Vector) -> i32 {
-        if self.is_valid(&position) {
-            self.distances[position]
+    fn move_to(&mut self, idx: usize, direction: Direction) -> Option<char> {
+        let position = self.humans[idx].position.neighbor(direction);
+        return if self.is_movable(&position) {
+            self.human_exists[&position] = true;
+            self.humans[idx].position = position;
+            Some(direction.to_char())
         } else {
-            World::INVALID_I32
-        }
+            None
+        };
     }
 
-    fn move_to(&mut self, position: &Vector) {
-        if self.is_movable(&position) {
-            self.human_exists[position] = true;
-        }
+    fn block(&mut self, idx: usize, direction: Direction) -> Option<char> {
+        let position = self.humans[idx].position.neighbor(direction);
+        return if self.is_blockable(&position) {
+            self.block_exists[&position] = true;
+            Some(direction.to_char().to_ascii_lowercase())
+        } else {
+            None
+        };
     }
 
-    fn block(&mut self, position: &Vector) {
-        if self.is_blockable(&position) {
-            self.block_exists[position] = true;
+    fn approach_to(&mut self, idx: usize, position: &Vector) -> Option<char> {
+        let distances = self.calc_distances(&vec![position.clone()]);
+        let distance = self.get_distance(&distances, &self.humans[idx].position);
+        if distance == World::INVALID_I32 {
+            return None;
         }
+
+        for direction in Direction::DIRECTION4.iter() {
+            let np = self.humans[idx].position.neighbor(*direction);
+            if self.is_valid(&np) && self.get_distance(&distances, &np) < distance {
+                if let Some(result) = self.move_to(idx, *direction) {
+                    return Some(result);
+                }
+            }
+        }
+
+        None
     }
 
     fn get_movable_min(&self) -> i32 {
@@ -547,6 +561,12 @@ where
             x,
             y,
             values: vec![e; x * y],
+        }
+    }
+
+    fn fill(&mut self, value: T) {
+        for i in 0..self.values.len() {
+            self.values[i] = value.clone();
         }
     }
 }
