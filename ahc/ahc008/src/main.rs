@@ -292,7 +292,7 @@ impl World {
     }
 
     fn act_setup_one(&mut self, idx: usize) -> char {
-        let x = 6 * (idx as i32 % 5) + 3;
+        let x = Block::DIV_X * 2 * (idx as i32 % 5) + Block::DIV_X;
         let y = if self.humans[idx].position.y < self.size as i32 / 2 {
             0
         } else {
@@ -310,7 +310,7 @@ impl World {
 
     fn act_setup_two(&mut self, idx: usize) -> char {
         let x = self.humans[idx].position.x;
-        let y = 10 * (idx as i32 % 2 + 1);
+        let y = Block::MIDDLE * (idx as i32 % 2 + 1);
         let position = Vector::new(x, y);
         match self.approach_to(idx, position) {
             None => {
@@ -591,6 +591,12 @@ struct Block {
 }
 
 impl Block {
+    const DIV_X: i32 = 3;
+    const DIV_Y: i32 = 11;
+    const LEFT: i32 = 0;
+    const MIDDLE: i32 = 10;
+    const RIGHT: i32 = 9;
+
     fn new(x: i32, y: i32, block_type: BlockType) -> Self {
         Self {
             position: Vector { x, y },
@@ -599,37 +605,40 @@ impl Block {
     }
 
     fn new_by_rule(x: i32, y: i32) -> Self {
-        if x % 3 == 0 {
-            match y % 11 {
-                9 | 0 => Block::new(x, y, BlockType::One),
+        let xd = x % Self::DIV_X;
+        let yd = y % Self::DIV_Y;
+        if xd == 0 {
+            match yd {
+                Self::LEFT | Self::RIGHT => Block::new(x, y, BlockType::One),
                 _ => Block::new(x, y, BlockType::None),
             }
-        } else if x % 3 == 1 {
-            match y % 11 {
-                9 => Block::new(x, y, BlockType::TwoR),
-                0 => Block::new(x, y, BlockType::TwoL),
+        } else if xd == 1 {
+            match yd {
+                Self::LEFT => Block::new(x, y, BlockType::TwoL),
+                Self::RIGHT => Block::new(x, y, BlockType::TwoR),
                 _ => Block::new(x, y, BlockType::None),
             }
         } else {
-            match y % 11 {
-                9 | 10 | 0 => Block::new(x, y, BlockType::None),
+            match yd {
+                Self::LEFT | Self::MIDDLE | Self::RIGHT => Block::new(x, y, BlockType::None),
                 _ => Block::new(x, y, BlockType::One),
             }
         }
     }
 
     fn is_targeted_by_rule(&self, target: Vector) -> bool {
+        let d = (Self::RIGHT - Self::LEFT).abs();
         match self.block_type {
             BlockType::None => false,
             BlockType::One => true,
             BlockType::TwoL => {
                 self.position.y <= target.y
-                    && target.y <= self.position.y + 9
+                    && target.y <= self.position.y + d
                     && self.position.x - 1 <= target.x
                     && target.x <= self.position.x
             }
             BlockType::TwoR => {
-                self.position.y - 9 <= target.y
+                self.position.y - d <= target.y
                     && target.y <= self.position.y
                     && self.position.x - 1 <= target.x
                     && target.x <= self.position.x
