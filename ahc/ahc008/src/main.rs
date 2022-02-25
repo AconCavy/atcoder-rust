@@ -303,7 +303,7 @@ impl World {
 
     fn act_setup_two(&mut self, idx: usize) -> char {
         let x = self.humans[idx].position.x;
-        let y = Block::MIDDLE * (idx as i32 % 2 + 1);
+        let y = Block::DIV_Y * (idx as i32 % 3) + Block::MIDDLE;
         let position = Vector::new(x, y);
         match self.approach_to(idx, position) {
             None => {
@@ -587,10 +587,10 @@ struct Block {
 
 impl Block {
     const DIV_X: i32 = 3;
-    const DIV_Y: i32 = 11;
+    const DIV_Y: i32 = 9;
     const LEFT: i32 = 0;
-    const MIDDLE: i32 = 10;
-    const RIGHT: i32 = 9;
+    const MIDDLE: i32 = 8;
+    const RIGHT: i32 = 7;
 
     fn new(x: i32, y: i32, block_type: BlockType) -> Self {
         Self {
