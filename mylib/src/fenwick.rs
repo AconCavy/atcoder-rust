@@ -31,4 +31,39 @@ impl FenwickTree {
 
         sum
     }
+
+    fn sum_of(&self, l: usize, r: usize) -> i64 {
+        assert!(l < r && r <= self.len);
+        self.sum(r) - self.sum(l)
+    }
+
+    fn bound(self, v: i64, compare: fn(i64, i64) -> bool) -> usize {
+        if v >= self.data[0] {
+            return 0;
+        }
+
+        let mut v = v;
+        let mut x = 0;
+        let mut k = 1;
+        while k < self.len {
+            k <<= 1;
+        }
+
+        let mut k = k;
+        loop {
+            if k <= 0 {
+                break;
+            }
+
+            if x + k - 1 >= self.len || compare(v, self.data[x + k - 1]) {
+                continue;
+            }
+
+            v -= self.data[x + k - 1];
+            x += k;
+            k >>= 1;
+        }
+
+        x
+    }
 }
