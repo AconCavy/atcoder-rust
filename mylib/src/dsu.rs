@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 struct Dsu {
     len: usize,
     parent_or_size: Vec<i32>,

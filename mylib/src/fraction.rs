@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Debug, Copy, Clone, Eq, Hash)]
 pub struct Fraction {
     y: i64,

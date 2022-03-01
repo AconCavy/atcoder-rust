@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 struct FenwickTree {
     len: usize,
     data: Vec<i64>,
