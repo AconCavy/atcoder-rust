@@ -2,3 +2,4 @@
 mod dsu;
 mod fenwick;
 mod fraction;
+mod util;
