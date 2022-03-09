@@ -16,3 +16,18 @@ fn compress<T: std::cmp::Ord + std::hash::Hash + std::cmp::Eq + Clone>(
 
     (map, remap)
 }
+
+fn binary_search<F: Fn(i64) -> bool>(ng: i64, ok: i64, f: F) -> i64 {
+    let mut ng = ng;
+    let mut ok = ok;
+    while (ok - ng).abs() > 1 {
+        let m = (ok + ng) / 2;
+        if f(m) {
+            ok = m;
+        } else {
+            ng = m;
+        }
+    }
+
+    ok
+}
