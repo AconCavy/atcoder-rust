@@ -30,11 +30,9 @@ fn main() {
         }
     }
     for (y, xl) in map_l {
-        if let Some(xr) = map_r.get(y) {
-            if *xr <= xl {
-                println!("Yes");
-                return;
-            }
+        if map_r.get(y).map_or(false, |xr| *xr <= xl) {
+            println!("Yes");
+            return;
         }
     }
 
