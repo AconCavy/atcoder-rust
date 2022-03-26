@@ -10,7 +10,7 @@ use std::io;
 use std::mem::*;
 use std::ops::{Add, AddAssign, Index, IndexMut, Sub, SubAssign};
 
-// #[fastout]
+#[fastout]
 fn main() {
     const H: usize = 20;
     const W: usize = 20;
@@ -106,7 +106,14 @@ fn main() {
             break;
         }
     }
+
     route.reverse();
+    let t = (1.0 / p).floor() as usize;
+    route = route
+        .iter()
+        .flat_map(|&x| vec![x; t])
+        .take(200)
+        .collect_vec();
     println!("{}", route.iter().map(|x| char::from(*x)).join(""));
 }
 
