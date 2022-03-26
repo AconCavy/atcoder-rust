@@ -4,6 +4,7 @@
 use itertools::Itertools;
 use proconio::marker::{Bytes, Chars, Usize1};
 use proconio::*;
+use rand::Rng;
 use std::cmp::*;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::io;
@@ -109,12 +110,23 @@ fn main() {
 
     route.reverse();
     let t = ((1.0 / p).floor() as usize).min(1).max(3);
-    route = route
-        .iter()
-        .flat_map(|&x| vec![x; t])
-        .take(200)
-        .collect_vec();
-    println!("{}", route.iter().map(|x| char::from(*x)).join(""));
+    let mut route2 = Vec::with_capacity(200);
+    for &dir in &route {
+        for _ in 0..t {
+            route2.push(dir);
+        }
+
+        let pp = rand::thread_rng().gen::<f64>();
+        if pp < p / 2.0 {
+            route2.push(Direction::L);
+        } else if pp < p {
+            route2.push(Direction::U);
+        }
+    }
+    println!(
+        "{}",
+        route2.iter().take(200).map(|x| char::from(*x)).join("")
+    );
 }
 
 #[derive(Copy, Clone, PartialEq)]
