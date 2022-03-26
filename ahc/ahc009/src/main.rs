@@ -109,19 +109,24 @@ fn main() {
     }
 
     route.reverse();
-    let t = ((1.0 / p).floor() as usize).max(1).min(3);
-    let mut route2 = Vec::with_capacity(200);
-    for &dir in &route {
-        for _ in 0..t {
+    let t = ((1.0 / p).ceil() as usize).max(1);
+    let mut route2 = Vec::with_capacity(400);
+    for _ in 0..t {
+        for &dir in &route {
             route2.push(dir);
-            let pp = rand::thread_rng().gen::<f64>();
-            if pp < 0.10 {
-                route2.push(Direction::L);
-            } else if pp < 0.20 {
-                route2.push(Direction::U);
+        }
+
+        for &dir in &route {
+            if rand::thread_rng().gen::<f64>() < p {
+                route2.push(dir.inv());
             }
         }
+
+        if route2.len() > 200 {
+            break;
+        }
     }
+
     println!(
         "{}",
         route2.iter().take(200).map(|x| char::from(*x)).join("")
@@ -180,13 +185,13 @@ enum Direction {
 }
 
 impl Direction {
-    fn inv_char(&self) -> char {
+    fn inv(&self) -> Direction {
         match self {
-            Direction::U => Direction::D.into(),
-            Direction::D => Direction::U.into(),
-            Direction::L => Direction::R.into(),
-            Direction::R => Direction::L.into(),
-            _ => '_',
+            Direction::U => Direction::D,
+            Direction::D => Direction::U,
+            Direction::L => Direction::R,
+            Direction::R => Direction::L,
+            _ => Direction::None,
         }
     }
 }
