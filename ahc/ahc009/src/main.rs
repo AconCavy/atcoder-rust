@@ -109,28 +109,18 @@ fn main() {
     }
 
     route.reverse();
-    let t = ((1.0 / p).ceil() as usize).max(1);
-    let mut route2 = Vec::with_capacity(400);
-    for _ in 0..t {
-        for &dir in &route {
-            route2.push(dir);
-        }
+    let route = route
+        .iter()
+        .map(|&x| x)
+        .chain(
+            route
+                .iter()
+                .filter(|_| rand::thread_rng().gen::<f64>() < p)
+                .map(|x| x.inv()),
+        )
+        .cycle();
 
-        for &dir in &route {
-            if rand::thread_rng().gen::<f64>() < p {
-                route2.push(dir.inv());
-            }
-        }
-
-        if route2.len() > 200 {
-            break;
-        }
-    }
-
-    println!(
-        "{}",
-        route2.iter().take(200).map(|x| char::from(*x)).join("")
-    );
+    println!("{}", route.take(200).map(|x| char::from(x)).join(""));
 }
 
 #[derive(Copy, Clone, PartialEq)]
