@@ -108,7 +108,7 @@ fn main() {
     }
 
     route.reverse();
-    let t = (1.0 / p).floor() as usize;
+    let t = ((1.0 / p).floor() as usize).min(1).max(3);
     route = route
         .iter()
         .flat_map(|&x| vec![x; t])
