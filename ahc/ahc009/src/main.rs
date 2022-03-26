@@ -109,18 +109,17 @@ fn main() {
     }
 
     route.reverse();
-    let t = ((1.0 / p).floor() as usize).min(1).max(3);
+    let t = ((1.0 / p).floor() as usize).max(1).min(3);
     let mut route2 = Vec::with_capacity(200);
     for &dir in &route {
         for _ in 0..t {
             route2.push(dir);
-        }
-
-        let pp = rand::thread_rng().gen::<f64>();
-        if pp < p / 2.0 {
-            route2.push(Direction::L);
-        } else if pp < p {
-            route2.push(Direction::U);
+            let pp = rand::thread_rng().gen::<f64>();
+            if pp < 0.10 {
+                route2.push(Direction::L);
+            } else if pp < 0.20 {
+                route2.push(Direction::U);
+            }
         }
     }
     println!(
