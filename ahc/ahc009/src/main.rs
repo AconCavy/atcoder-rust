@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDequ
 use std::io;
 use std::mem::*;
 use std::ops::{Add, AddAssign, Index, IndexMut, Sub, SubAssign};
+use std::time::{Duration, Instant};
 
 #[fastout]
 fn main() {
@@ -109,18 +110,70 @@ fn main() {
     }
 
     route.reverse();
-    let route = route
-        .iter()
-        .map(|&x| x)
-        .chain(
-            route
-                .iter()
-                .filter(|_| rand::thread_rng().gen::<f64>() < p)
-                .map(|x| x.inv()),
-        )
-        .cycle();
 
-    println!("{}", route.take(200).map(|x| char::from(x)).join(""));
+    let calc_score = |out: &[Direction]| -> i64 {
+        let mut score = Grid::new(H, W, 0.0);
+        score[s] = 1.0;
+        let mut sum = 0.0;
+        let mut goal = 0.0;
+        for k in 0..out.len() {
+            let mut next = Grid::new(H, W, 0.0);
+            for i in 0..H {
+                for j in 0..W {
+                    let u = Vector2D::new(i as i32, j as i32);
+                    if score[u] > 0.0 {
+                        let dir = out[k].to_Vector2D();
+                        let v = u + dir;
+                        if 0 <= v.h && v.h < H as i32 && 0 <= v.w && v.w < W as i32 {
+                            next[v] += score[u] * (1.0 - p);
+                            next[u] += score[u] * p;
+                        } else {
+                            next[u] += score[u];
+                        }
+                    }
+                }
+            }
+            score = next;
+            sum += score[t] * (400 - k) as f64;
+            goal += score[t];
+            score[t] = 0.0;
+        }
+        score[t] = goal;
+        (1e8 * sum / 400.0).round() as i64
+    };
+
+    let mut answer = Vec::new();
+    let mut max_score = 0;
+
+    let timer = Instant::now();
+    let end = Duration::from_millis(1900);
+    let mut seed = 0;
+    while timer.elapsed() < end {
+        let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
+
+        let tmp = route
+            .iter()
+            .map(|&x| x)
+            .chain(
+                route
+                    .iter()
+                    .filter(move |_| rng.gen::<f64>() < 0.5)
+                    .map(|x| x.inv()),
+            )
+            .cycle()
+            .take(200)
+            .collect_vec();
+
+        let score = calc_score(&tmp);
+        if score >= max_score {
+            max_score = score;
+            answer = tmp;
+        }
+
+        seed += 1;
+    }
+
+    println!("{}", answer.into_iter().map(|x| char::from(x)).join(""));
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -182,6 +235,16 @@ impl Direction {
             Direction::L => Direction::R,
             Direction::R => Direction::L,
             _ => Direction::None,
+        }
+    }
+
+    fn to_Vector2D(&self) -> Vector2D {
+        match self {
+            Direction::U => Vector2D::new(-1, 0),
+            Direction::D => Vector2D::new(1, 0),
+            Direction::L => Vector2D::new(0, -1),
+            Direction::R => Vector2D::new(0, 1),
+            _ => Vector2D::new(0, 0),
         }
     }
 }
