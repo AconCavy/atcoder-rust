@@ -66,8 +66,8 @@ exit /b
 
   echo Create %OUTPUT_FILE%.
 
-  echo #![allow(dead_code)]>> %OUTPUT_FILE%
-  echo #![allow(unused_imports)]>> %OUTPUT_FILE%
+  echo #^^![allow(dead_code)]>> %OUTPUT_FILE%
+  echo #^^![allow(unused_imports)]>> %OUTPUT_FILE%
   echo;>> %OUTPUT_FILE%
   echo use itertools::Itertools;>> %OUTPUT_FILE%
   echo use proconio::marker::{Bytes, Chars, Usize1};>> %OUTPUT_FILE%
