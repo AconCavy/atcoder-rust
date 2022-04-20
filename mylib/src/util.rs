@@ -5,7 +5,7 @@ use num_integer::Integer;
 use num_traits::Signed;
 use std::collections::{HashMap, HashSet};
 
-fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
+pub fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
     source: &[T],
 ) -> (HashMap<T, usize>, HashMap<usize, T>) {
     let set: HashSet<_> = source.iter().collect();
@@ -19,7 +19,7 @@ fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
     (map, remap)
 }
 
-fn binary_search<T: Copy + Integer + Signed, F: Fn(T) -> bool>(ng: T, ok: T, f: F) -> T {
+pub fn binary_search<T: Copy + Integer + Signed, F: Fn(T) -> bool>(ng: T, ok: T, f: F) -> T {
     let mut ng = ng;
     let mut ok = ok;
     let two = T::one() + T::one();
@@ -35,7 +35,7 @@ fn binary_search<T: Copy + Integer + Signed, F: Fn(T) -> bool>(ng: T, ok: T, f: 
     ok
 }
 
-fn lower_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
+pub fn lower_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
     let mut l = -1;
     let mut r = v.len() as isize;
     while r - l > 1 {
@@ -49,7 +49,7 @@ fn lower_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
     r as usize
 }
 
-fn upper_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
+pub fn upper_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
     let mut l = -1;
     let mut r = v.len() as isize;
     while r - l > 1 {
@@ -63,7 +63,7 @@ fn upper_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
     r as usize
 }
 
-fn gcd<T: Copy + Integer>(a: T, b: T) -> T {
+pub fn gcd<T: Copy + Integer>(a: T, b: T) -> T {
     if b == T::zero() {
         a
     } else {
@@ -71,11 +71,11 @@ fn gcd<T: Copy + Integer>(a: T, b: T) -> T {
     }
 }
 
-fn lcm<T: Copy + Integer>(a: T, b: T) -> T {
+pub fn lcm<T: Copy + Integer>(a: T, b: T) -> T {
     a / gcd(a, b) * b
 }
 
-fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
+pub fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
     if b == T::zero() {
         (a, T::one(), T::zero())
     } else {

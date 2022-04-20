@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-fn get_factors(v: i64) -> Vec<i64> {
+pub fn get_factors(v: i64) -> Vec<i64> {
     let mut result = Vec::new();
     if v < 2 {
         return result;
@@ -28,7 +28,7 @@ fn get_factors(v: i64) -> Vec<i64> {
     result
 }
 
-fn is_prime(v: i64) -> bool {
+pub fn is_prime(v: i64) -> bool {
     if v == 2 {
         return true;
     }
@@ -49,7 +49,7 @@ fn is_prime(v: i64) -> bool {
     true
 }
 
-fn sieve(v: i64) -> Vec<i64> {
+pub fn sieve(v: i64) -> Vec<i64> {
     let mut result = Vec::new();
     if v < 2 {
         return result;

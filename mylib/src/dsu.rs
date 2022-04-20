@@ -1,19 +1,19 @@
 #![allow(dead_code)]
 
-struct Dsu {
+pub struct Dsu {
     len: usize,
     parent_or_size: Vec<i32>,
 }
 
 impl Dsu {
-    fn new(size: usize) -> Self {
+    pub fn new(size: usize) -> Self {
         Self {
             len: size,
             parent_or_size: vec![-1; size],
         }
     }
 
-    fn merge(&mut self, u: usize, v: usize) -> usize {
+    pub fn merge(&mut self, u: usize, v: usize) -> usize {
         assert!(u < self.len);
         assert!(v < self.len);
         let (mut x, mut y) = (self.leader_of(u), self.leader_of(v));
@@ -30,13 +30,13 @@ impl Dsu {
         x
     }
 
-    fn same(&mut self, u: usize, v: usize) -> bool {
+    pub fn same(&mut self, u: usize, v: usize) -> bool {
         assert!(u < self.len);
         assert!(v < self.len);
         self.leader_of(u) == self.leader_of(v)
     }
 
-    fn leader_of(&mut self, u: usize) -> usize {
+    pub fn leader_of(&mut self, u: usize) -> usize {
         assert!(u < self.len);
         if self.parent_or_size[u] < 0 {
             return u;
@@ -46,13 +46,13 @@ impl Dsu {
         self.parent_or_size[u] as usize
     }
 
-    fn size_of(&mut self, u: usize) -> usize {
+    pub fn size_of(&mut self, u: usize) -> usize {
         assert!(u < self.len);
         let u = self.leader_of(u);
         -self.parent_or_size[u] as usize
     }
 
-    fn groups(&mut self) -> Vec<Vec<usize>> {
+    pub fn groups(&mut self) -> Vec<Vec<usize>> {
         let mut leader_of = vec![0; self.len];
         let mut group_size = vec![0; self.len];
         for i in 0..self.len {

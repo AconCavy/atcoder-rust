@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-struct FenwickTree<T> {
+pub struct FenwickTree<T> {
     len: usize,
     data: Vec<T>,
     e: T,
 }
 
 impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
-    fn new(len: usize, e: T) -> Self {
+    pub fn new(len: usize, e: T) -> Self {
         Self {
             len,
             data: vec![e.clone(); len],
@@ -15,7 +15,7 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
         }
     }
 
-    fn add(&mut self, i: usize, v: T) {
+    pub fn add(&mut self, i: usize, v: T) {
         assert!(i < self.len);
         let mut i = i as i32 + 1;
         while i as usize <= self.len {
@@ -24,7 +24,7 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
         }
     }
 
-    fn accum(&self, len: usize) -> T {
+    pub fn accum(&self, len: usize) -> T {
         assert!(len <= self.len);
         let mut len = len as i32;
         let mut sum = self.e.clone();
@@ -36,7 +36,7 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
         sum
     }
 
-    fn sum(&self, l: usize, r: usize) -> T
+    pub fn sum(&self, l: usize, r: usize) -> T
     where
         T: std::ops::Sub<Output = T>,
     {
@@ -44,7 +44,7 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
         self.accum(r) - self.accum(l)
     }
 
-    fn bound<F: Fn(T, T) -> bool>(&self, v: T, compare: F) -> usize
+    pub fn bound<F: Fn(T, T) -> bool>(&self, v: T, compare: F) -> usize
     where
         T: std::ops::SubAssign,
     {
