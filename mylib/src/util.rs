@@ -2,6 +2,7 @@
 
 use itertools::Itertools;
 use num_integer::Integer;
+use num_traits::Signed;
 use std::collections::{HashMap, HashSet};
 
 fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
@@ -18,11 +19,12 @@ fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
     (map, remap)
 }
 
-fn binary_search<F: Fn(i64) -> bool>(ng: i64, ok: i64, f: F) -> i64 {
+fn binary_search<T: Copy + Integer + Signed, F: Fn(T) -> bool>(ng: T, ok: T, f: F) -> T {
     let mut ng = ng;
     let mut ok = ok;
-    while (ok - ng).abs() > 1 {
-        let m = (ok + ng) / 2;
+    let two = T::one() + T::one();
+    while (ok - ng).abs() > T::one() {
+        let m = (ok + ng) / two;
         if f(m) {
             ok = m;
         } else {
@@ -79,6 +81,15 @@ fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
     } else {
         let (g, x, y) = ext_gcd(b, a % b);
         (g, y, x - (a / b) * y)
+    }
+}
+
+#[test]
+fn binary_search_test() {
+    let ok = 100;
+    let ng = -1;
+    for v in 0..=100 {
+        assert_eq!(binary_search(ng, ok, |x| x >= v), v);
     }
 }
 
