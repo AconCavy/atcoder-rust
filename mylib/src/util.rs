@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use itertools::Itertools;
+use num_integer::Integer;
 use std::collections::{HashMap, HashSet};
 
 fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
@@ -58,4 +59,35 @@ fn upper_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
         }
     }
     r as usize
+}
+
+fn gcd<T: Copy + Integer>(a: T, b: T) -> T {
+    if b == T::zero() {
+        a
+    } else {
+        gcd(b, a % b)
+    }
+}
+
+fn lcm<T: Copy + Integer>(a: T, b: T) -> T {
+    a / gcd(a, b) * b
+}
+
+fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
+    if b == T::zero() {
+        (a, T::one(), T::zero())
+    } else {
+        let (g, x, y) = ext_gcd(b, a % b);
+        (g, y, x - (a / b) * y)
+    }
+}
+
+#[test]
+fn ext_gcd_test() {
+    for a in 0..=100 {
+        for b in 0..=100 {
+            let (g, x, y) = ext_gcd(a, b);
+            assert_eq!((a * x) + (b * y), g);
+        }
+    }
 }
