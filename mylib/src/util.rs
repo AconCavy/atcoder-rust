@@ -31,3 +31,31 @@ fn binary_search<F: Fn(i64) -> bool>(ng: i64, ok: i64, f: F) -> i64 {
 
     ok
 }
+
+fn lower_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
+    let mut l = -1;
+    let mut r = v.len() as isize;
+    while r - l > 1 {
+        let m = l + (r - l) / 2;
+        if v[m as usize] >= key {
+            r = m;
+        } else {
+            l = m;
+        }
+    }
+    r as usize
+}
+
+fn upper_bound<T: std::cmp::Ord>(v: &[T], key: T) -> usize {
+    let mut l = -1;
+    let mut r = v.len() as isize;
+    while r - l > 1 {
+        let m = l + (r - l) / 2;
+        if v[m as usize] > key {
+            r = m;
+        } else {
+            l = m;
+        }
+    }
+    r as usize
+}
