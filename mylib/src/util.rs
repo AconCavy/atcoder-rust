@@ -3,7 +3,7 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-fn compress<T: std::cmp::Ord + std::hash::Hash + std::cmp::Eq + Clone>(
+fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
     source: &[T],
 ) -> (HashMap<T, usize>, HashMap<usize, T>) {
     let set: HashSet<_> = source.iter().collect();
