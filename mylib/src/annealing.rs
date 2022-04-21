@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 pub trait AnnealingState {
     fn calc_score(&self) -> u64;
     fn modify(&self) -> Self;
+    fn is_valid(&self) -> bool;
 }
 
 pub struct AnnealingSimulator {
@@ -43,12 +44,13 @@ impl AnnealingSimulator {
 
         while timer.elapsed() < end {
             let state = best_state.modify();
-            let score = state.calc_score();
-            let temp = calc_temp(timer.elapsed().as_millis() as f64);
-
-            if calc_prob(best_score, score, temp) >= rng.gen::<f64>() {
-                best_state = state;
-                best_score = score;
+            if state.is_valid() {
+                let score = state.calc_score();
+                let temp = calc_temp(timer.elapsed().as_millis() as f64);
+                if calc_prob(best_score, score, temp) >= rng.gen::<f64>() {
+                    best_state = state;
+                    best_score = score;
+                }
             }
         }
 
