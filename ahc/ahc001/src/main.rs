@@ -27,12 +27,40 @@ pub fn main() {
     const TIME_LIMIT: u64 = 4950;
     const START_TEMP: f64 = 1e-7;
     const END_TEMP: f64 = 1e-5;
-    const SEED: u64 = 0;
-    let simulator = AnnealingSimulator::new(TIME_LIMIT, START_TEMP, END_TEMP, SEED);
-    let state = State::new(n, requests, ads, true);
-    let result = simulator.simulate(state);
-    // println!("\n{}", result.calc_score());
+    const EXPANSION: u64 = 2000;
+    let simulator = AnnealingSimulator::new(EXPANSION, START_TEMP, END_TEMP, 0);
+    let state = State::new(n, requests, ads, true, DirType::D4);
+    let mut expanded = simulator.simulate(state);
+
+    let simulator = AnnealingSimulator::new(TIME_LIMIT - EXPANSION, START_TEMP, END_TEMP, 1);
+    expanded.dir_type = DirType::D12;
+    let result = simulator.simulate(expanded);
+    // println!("\n{}", (result.calc_score() * 1e9) as i64);
     println!("{}", result.ads.into_iter().join("\n"));
+}
+
+#[derive(Copy, Clone)]
+pub enum DirType {
+    D4 = 4,
+    D8 = 8,
+    D12 = 12,
+}
+
+impl DirType {
+    const DIR: [(i64, i64, i64, i64); 12] = [
+        (-1, 0, 0, 0),
+        (0, -1, 0, 0),
+        (0, 0, 1, 0),
+        (0, 0, 0, 1),
+        (-1, 0, -1, 0),
+        (0, -1, 0, -1),
+        (1, 0, 1, 0),
+        (0, 1, 0, 1),
+        (1, 0, 0, 0),
+        (0, 1, 0, 0),
+        (0, 0, -1, 0),
+        (0, 0, 0, -1),
+    ];
 }
 
 #[derive(Clone)]
@@ -41,15 +69,23 @@ pub struct State {
     requests: Vec<Request>,
     ads: Vec<Ad>,
     is_valid: bool,
+    dir_type: DirType,
 }
 
 impl State {
-    pub fn new(n: usize, requests: Vec<Request>, ads: Vec<Ad>, is_valid: bool) -> Self {
+    pub fn new(
+        n: usize,
+        requests: Vec<Request>,
+        ads: Vec<Ad>,
+        is_valid: bool,
+        dir_type: DirType,
+    ) -> Self {
         Self {
             n,
             requests,
             ads,
             is_valid,
+            dir_type,
         }
     }
 
@@ -69,6 +105,7 @@ impl State {
             .zip(ads.iter())
             .map(|(r, a)| State::calc(r, a))
             .fold(0.0, |acc, x| acc + x)
+            / ads.len() as f64
     }
 }
 
@@ -79,9 +116,10 @@ impl AnnealingState for State {
 
     fn modify(&self, rng: &mut rand::rngs::StdRng) -> Self {
         let idx = rng.gen_range(0, self.n);
-        let dir = rng.gen_range(0, Ad::DIR.len());
+        let dir = rng.gen_range(0, self.dir_type as usize);
         let mut modified = self.ads.clone();
-        modified[idx].arrange(dir);
+        let (dx0, dy0, dx1, dy1) = DirType::DIR[dir];
+        modified[idx].arrange(dx0, dy0, dx1, dy1);
         let mut ok = modified[idx].is_valid();
         for (i, other) in self.ads.iter().enumerate() {
             if !ok {
@@ -92,7 +130,7 @@ impl AnnealingState for State {
             }
         }
 
-        State::new(self.n, self.requests.clone(), modified, ok)
+        State::new(self.n, self.requests.clone(), modified, ok, self.dir_type)
     }
 
     fn is_valid(&self) -> bool {
@@ -167,28 +205,29 @@ pub struct Ad {
 }
 
 impl Ad {
-    pub fn new(x1: i64, y1: i64, x2: i64, y2: i64) -> Self {
+    const MIN: i64 = 0;
+    const MAX: i64 = 10000;
+
+    pub fn new(x0: i64, y0: i64, x1: i64, y1: i64) -> Self {
         Self {
             rect: Rect {
-                p0: Point { x: x1, y: y1 },
-                p1: Point { x: x2, y: y2 },
+                p0: Point { x: x0, y: y0 },
+                p1: Point { x: x1, y: y1 },
             },
         }
     }
 
     pub fn is_valid(&self) -> bool {
-        let min = 0;
-        let max = 10000;
-        min <= self.rect.p0.x
-            && self.rect.p0.x <= max
-            && min <= self.rect.p0.y
-            && self.rect.p0.y <= max
-            && min <= self.rect.p1.x
-            && self.rect.p1.x <= max
-            && min <= self.rect.p1.y
-            && self.rect.p1.y <= max
-            && self.rect.p0.x <= self.rect.p1.x
-            && self.rect.p0.y <= self.rect.p1.y
+        Ad::MIN <= self.rect.p0.x
+            && self.rect.p0.x <= Ad::MAX
+            && Ad::MIN <= self.rect.p0.y
+            && self.rect.p0.y <= Ad::MAX
+            && Ad::MIN <= self.rect.p1.x
+            && self.rect.p1.x <= Ad::MAX
+            && Ad::MIN <= self.rect.p1.y
+            && self.rect.p1.y <= Ad::MAX
+            && self.rect.p0.x < self.rect.p1.x
+            && self.rect.p0.y < self.rect.p1.y
     }
 
     pub fn contains(&self, req: &Request) -> bool {
@@ -203,25 +242,11 @@ impl Ad {
         self.rect.area()
     }
 
-    const DIR: [(i64, i64, i64, i64); 12] = [
-        (-1, 0, 0, 0),
-        (0, -1, 0, 0),
-        (0, 0, 1, 0),
-        (0, 0, 0, 1),
-        (-1, 0, -1, 0),
-        (0, -1, 0, -1),
-        (1, 0, 1, 0),
-        (0, 1, 0, 1),
-        (1, 0, 0, 0),
-        (0, 1, 0, 0),
-        (0, 0, -1, 0),
-        (0, 0, 0, -1),
-    ];
-    pub fn arrange(&mut self, dir: usize) {
-        assert!(dir < Ad::DIR.len());
-        let (dx1, dy1, dx2, dy2) = Self::DIR[dir];
-        self.rect.p0.translate(dx1, dy1);
-        self.rect.p1.translate(dx2, dy2);
+    // pub fn arrange(&mut self, dir: usize) {
+    pub fn arrange(&mut self, dx0: i64, dy0: i64, dx1: i64, dy1: i64) {
+        // let (dx1, dy1, dx2, dy2) = Self::DIR[dir];
+        self.rect.p0.translate(dx0, dy0);
+        self.rect.p1.translate(dx1, dy1);
     }
 }
 
