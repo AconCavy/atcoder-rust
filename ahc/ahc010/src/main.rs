@@ -24,28 +24,26 @@ pub struct AnnealingSimulator {
     time_limit_millis: u64,
     start_temp: f64,
     end_temp: f64,
-    random_seed: u64,
 }
 
 impl AnnealingSimulator {
-    pub fn new(time_limit_millis: u64, start_temp: f64, end_temp: f64, random_seed: u64) -> Self {
+    pub fn new(time_limit_millis: u64, start_temp: f64, end_temp: f64) -> Self {
         Self {
             time_limit_millis,
             start_temp,
             end_temp,
-            random_seed,
         }
     }
 
-    pub fn simulate<S: AnnealingState + Clone>(&self, init_state: S) -> S {
+    pub fn simulate<S: AnnealingState + Clone>(&self, init_state: S, seed: u64) -> S {
         let timer = Instant::now();
         let end = Duration::from_millis(self.time_limit_millis);
         let mut curr_state = init_state;
         let mut curr_score = curr_state.calc_score();
         let mut best_state = curr_state.clone();
         let mut best_score = curr_score;
-        let mut rng_prob: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(self.random_seed);
-        let mut rng_modify: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(self.random_seed);
+        let mut rng_prob: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
+        let mut rng_modify: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
 
         let calc_temp = |elapsed: f64| -> f64 {
             self.start_temp
