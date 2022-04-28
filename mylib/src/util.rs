@@ -4,6 +4,7 @@ use itertools::Itertools;
 use num_integer::Integer;
 use num_traits::Signed;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 
 pub fn compress<T: Clone + Eq + Ord + std::hash::Hash>(
     source: &[T],
@@ -82,6 +83,24 @@ pub fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
         let (g, x, y) = ext_gcd(b, a % b);
         (g, y, x - (a / b) * y)
     }
+}
+
+pub type Pos = (usize, usize);
+pub fn d4(curr: Pos, lim: Pos) -> impl Iterator<Item = Pos> {
+    let d = [(-1, 0), (0, -1), (1, 0), (0, 1)];
+    let mut i = 0;
+    std::iter::from_fn(move || {
+        while i < d.len() {
+            let nh = usize::try_from(curr.0 as i32 + d[i].0).unwrap_or(lim.0);
+            let nw = usize::try_from(curr.1 as i32 + d[i].1).unwrap_or(lim.1);
+            i += 1;
+            if nh < lim.0 && nw < lim.1 {
+                return Some((nh, nw));
+            }
+        }
+
+        None
+    })
 }
 
 #[test]
