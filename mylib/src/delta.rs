@@ -28,31 +28,36 @@ impl<'a> DeltaIndex<'a> {
     }
 }
 
-#[test]
-fn delta_test() {
-    let d4 = DeltaIndex::new((3, 3), &[(0, -1), (-1, 0), (0, 1), (1, 0)]);
-    assert_eq!(d4.generate((0, 0)).collect::<Vec<_>>(), [(0, 1), (1, 0)]);
-    assert_eq!(d4.generate((0, 2)).collect::<Vec<_>>(), [(0, 1), (1, 2)]);
-    assert_eq!(d4.generate((2, 0)).collect::<Vec<_>>(), [(1, 0), (2, 1)]);
-    assert_eq!(d4.generate((2, 2)).collect::<Vec<_>>(), [(2, 1), (1, 2)]);
-    assert_eq!(
-        d4.generate((0, 1)).collect::<Vec<_>>(),
-        [(0, 0), (0, 2), (1, 1)]
-    );
-    assert_eq!(
-        d4.generate((1, 0)).collect::<Vec<_>>(),
-        [(0, 0), (1, 1), (2, 0)]
-    );
-    assert_eq!(
-        d4.generate((1, 2)).collect::<Vec<_>>(),
-        [(1, 1), (0, 2), (2, 2)]
-    );
-    assert_eq!(
-        d4.generate((2, 1)).collect::<Vec<_>>(),
-        [(2, 0), (1, 1), (2, 2)]
-    );
-    assert_eq!(
-        d4.generate((1, 1)).collect::<Vec<_>>(),
-        [(1, 0), (0, 1), (1, 2), (2, 1)]
-    );
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delta_test() {
+        let d4 = DeltaIndex::new((3, 3), &[(0, -1), (-1, 0), (0, 1), (1, 0)]);
+        assert_eq!(d4.generate((0, 0)).collect::<Vec<_>>(), [(0, 1), (1, 0)]);
+        assert_eq!(d4.generate((0, 2)).collect::<Vec<_>>(), [(0, 1), (1, 2)]);
+        assert_eq!(d4.generate((2, 0)).collect::<Vec<_>>(), [(1, 0), (2, 1)]);
+        assert_eq!(d4.generate((2, 2)).collect::<Vec<_>>(), [(2, 1), (1, 2)]);
+        assert_eq!(
+            d4.generate((0, 1)).collect::<Vec<_>>(),
+            [(0, 0), (0, 2), (1, 1)]
+        );
+        assert_eq!(
+            d4.generate((1, 0)).collect::<Vec<_>>(),
+            [(0, 0), (1, 1), (2, 0)]
+        );
+        assert_eq!(
+            d4.generate((1, 2)).collect::<Vec<_>>(),
+            [(1, 1), (0, 2), (2, 2)]
+        );
+        assert_eq!(
+            d4.generate((2, 1)).collect::<Vec<_>>(),
+            [(2, 0), (1, 1), (2, 2)]
+        );
+        assert_eq!(
+            d4.generate((1, 1)).collect::<Vec<_>>(),
+            [(1, 0), (0, 1), (1, 2), (2, 1)]
+        );
+    }
 }

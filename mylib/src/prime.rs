@@ -71,44 +71,49 @@ pub fn sieve(v: i64) -> Vec<i64> {
     result
 }
 
-#[test]
-fn get_factors_test() {
-    assert_eq!(get_factors(0), []);
-    assert_eq!(get_factors(1), []);
-    assert_eq!(get_factors(2), [2]);
-    assert_eq!(get_factors(3), [3]);
-    assert_eq!(get_factors(4), [2, 2]);
-    assert_eq!(get_factors(5), [5]);
-    assert_eq!(get_factors(6), [2, 3]);
-    assert_eq!(get_factors(7), [7]);
-    assert_eq!(get_factors(8), [2, 2, 2]);
-    assert_eq!(get_factors(9), [3, 3]);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn is_prime_test() {
-    assert_eq!(is_prime(0), false);
-    assert_eq!(is_prime(1), false);
-    assert_eq!(is_prime(2), true);
-    assert_eq!(is_prime(3), true);
-    assert_eq!(is_prime(4), false);
-    assert_eq!(is_prime(5), true);
-    assert_eq!(is_prime(6), false);
-    assert_eq!(is_prime(7), true);
-    assert_eq!(is_prime(8), false);
-    assert_eq!(is_prime(9), false);
-}
+    #[test]
+    fn get_factors_test() {
+        assert_eq!(get_factors(0), []);
+        assert_eq!(get_factors(1), []);
+        assert_eq!(get_factors(2), [2]);
+        assert_eq!(get_factors(3), [3]);
+        assert_eq!(get_factors(4), [2, 2]);
+        assert_eq!(get_factors(5), [5]);
+        assert_eq!(get_factors(6), [2, 3]);
+        assert_eq!(get_factors(7), [7]);
+        assert_eq!(get_factors(8), [2, 2, 2]);
+        assert_eq!(get_factors(9), [3, 3]);
+    }
 
-#[test]
-fn sieve_test() {
-    assert_eq!(sieve(0), []);
-    assert_eq!(sieve(1), []);
-    assert_eq!(sieve(2), [2]);
-    assert_eq!(sieve(3), [2, 3]);
-    assert_eq!(sieve(4), [2, 3]);
-    assert_eq!(sieve(5), [2, 3, 5]);
-    assert_eq!(sieve(6), [2, 3, 5]);
-    assert_eq!(sieve(7), [2, 3, 5, 7]);
-    assert_eq!(sieve(8), [2, 3, 5, 7]);
-    assert_eq!(sieve(9), [2, 3, 5, 7]);
+    #[test]
+    fn is_prime_test() {
+        assert_eq!(is_prime(0), false);
+        assert_eq!(is_prime(1), false);
+        assert_eq!(is_prime(2), true);
+        assert_eq!(is_prime(3), true);
+        assert_eq!(is_prime(4), false);
+        assert_eq!(is_prime(5), true);
+        assert_eq!(is_prime(6), false);
+        assert_eq!(is_prime(7), true);
+        assert_eq!(is_prime(8), false);
+        assert_eq!(is_prime(9), false);
+    }
+
+    #[test]
+    fn sieve_test() {
+        assert_eq!(sieve(0), []);
+        assert_eq!(sieve(1), []);
+        assert_eq!(sieve(2), [2]);
+        assert_eq!(sieve(3), [2, 3]);
+        assert_eq!(sieve(4), [2, 3]);
+        assert_eq!(sieve(5), [2, 3, 5]);
+        assert_eq!(sieve(6), [2, 3, 5]);
+        assert_eq!(sieve(7), [2, 3, 5, 7]);
+        assert_eq!(sieve(8), [2, 3, 5, 7]);
+        assert_eq!(sieve(9), [2, 3, 5, 7]);
+    }
 }

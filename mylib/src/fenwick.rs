@@ -60,7 +60,7 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
         }
 
         while k > 0 {
-            if x + k - 1 >= self.len || compare(v.clone(), self.data[x + k - 1].clone()) {
+            if x + k > self.len || compare(v.clone(), self.data[x + k - 1].clone()) {
                 k >>= 1;
                 continue;
             }
@@ -74,58 +74,63 @@ impl<T: Clone + std::ops::AddAssign> FenwickTree<T> {
     }
 }
 
-#[test]
-fn fenwick_tree_naive_test() {
-    for n in 0..=50 {
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fenwick_tree_naive_test() {
+        for n in 0..=50 {
+            let e = 0;
+            let mut ft = FenwickTree::new(n, e);
+            assert_eq!(ft.len, n);
+
+            for i in 0..n {
+                ft.add(i, (i * i) as i32);
+            }
+
+            for i in 0..=n {
+                let mut sum = e;
+                for j in 0..i {
+                    sum += (j * j) as i32;
+                }
+                assert_eq!(ft.accum(i), sum);
+            }
+
+            for l in 0..=n {
+                for r in l..=n {
+                    let mut sum = e;
+                    for i in l..r {
+                        sum += (i * i) as i32;
+                    }
+                    assert_eq!(ft.sum(l, r), sum);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fenwick_tree_bound_test() {
+        let n = 10;
         let e = 0;
         let mut ft = FenwickTree::new(n, e);
-        assert_eq!(ft.len, n);
+        for i in 0..n {
+            ft.add(i, (i + 1) as i32);
+        }
+        let mut cum = vec![e; n + 1];
+        for i in 1..=n {
+            cum[i] = cum[i - 1] + i as i32;
+        }
+
+        let lower_bound = |x, y| x <= y;
+        let upper_bound = |x, y| x < y;
 
         for i in 0..n {
-            ft.add(i, (i * i) as i32);
+            assert_eq!(ft.bound(cum[i + 1], lower_bound), i);
+            assert_eq!(ft.bound(cum[i + 1] + 1, lower_bound), (i + 1).min(n));
+
+            assert_eq!(ft.bound(cum[i + 1], upper_bound), (i + 1).min(n));
+            assert_eq!(ft.bound(cum[i + 1] - 1, upper_bound), i);
         }
-
-        for i in 0..=n {
-            let mut sum = e;
-            for j in 0..i {
-                sum += (j * j) as i32;
-            }
-            assert_eq!(ft.accum(i), sum);
-        }
-
-        for l in 0..=n {
-            for r in l..=n {
-                let mut sum = e;
-                for i in l..r {
-                    sum += (i * i) as i32;
-                }
-                assert_eq!(ft.sum(l, r), sum);
-            }
-        }
-    }
-}
-
-#[test]
-fn fenwick_tree_bound_test() {
-    let n = 10;
-    let e = 0;
-    let mut ft = FenwickTree::new(n, e);
-    for i in 0..n {
-        ft.add(i, (i + 1) as i32);
-    }
-    let mut cum = vec![e; n + 1];
-    for i in 1..=n {
-        cum[i] = cum[i - 1] + i as i32;
-    }
-
-    let lower_bound = |x, y| x <= y;
-    let upper_bound = |x, y| x < y;
-
-    for i in 0..n {
-        assert_eq!(ft.bound(cum[i + 1], lower_bound), i);
-        assert_eq!(ft.bound(cum[i + 1] + 1, lower_bound), (i + 1).min(n));
-
-        assert_eq!(ft.bound(cum[i + 1], upper_bound), (i + 1).min(n));
-        assert_eq!(ft.bound(cum[i + 1] - 1, upper_bound), i);
     }
 }

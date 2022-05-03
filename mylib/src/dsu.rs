@@ -21,7 +21,7 @@ impl Dsu {
             return x;
         }
 
-        if -self.parent_or_size[u] < -self.parent_or_size[v] {
+        if -self.parent_or_size[x] < -self.parent_or_size[y] {
             std::mem::swap(&mut x, &mut y);
         }
 
@@ -59,10 +59,7 @@ impl Dsu {
             leader_of[i] = self.leader_of(i);
             group_size[leader_of[i]] += 1;
         }
-        let mut result: Vec<Vec<_>> = group_size
-            .into_iter()
-            .map(|c| Vec::with_capacity(c))
-            .collect();
+        let mut result: Vec<Vec<_>> = group_size.into_iter().map(Vec::with_capacity).collect();
         for (i, v) in leader_of.into_iter().enumerate() {
             result[v].push(i);
         }
@@ -70,17 +67,22 @@ impl Dsu {
     }
 }
 
-#[test]
-fn dsu_test() {
-    let mut dsu = Dsu::new(4);
-    dsu.merge(0, 1);
-    assert!(dsu.same(0, 1));
-    dsu.merge(0, 2);
-    assert_eq!(dsu.size_of(0), 3);
-    assert!(dsu.same(0, 2));
-    assert!(dsu.same(1, 2));
-    assert!(!dsu.same(0, 3));
-    assert!(!dsu.same(1, 3));
-    assert!(!dsu.same(2, 3));
-    assert_eq!(dsu.groups(), vec![vec![0, 1, 2], vec![3]]);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dsu_test() {
+        let mut dsu = Dsu::new(4);
+        dsu.merge(0, 1);
+        assert!(dsu.same(0, 1));
+        dsu.merge(0, 2);
+        assert_eq!(dsu.size_of(0), 3);
+        assert!(dsu.same(0, 2));
+        assert!(dsu.same(1, 2));
+        assert!(!dsu.same(0, 3));
+        assert!(!dsu.same(1, 3));
+        assert!(!dsu.same(2, 3));
+        assert_eq!(dsu.groups(), vec![vec![0, 1, 2], vec![3]]);
+    }
 }
