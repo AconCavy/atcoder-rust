@@ -29,21 +29,21 @@ pub fn get_factors(v: i64) -> Vec<i64> {
 }
 
 pub fn is_prime(v: i64) -> bool {
-    if v == 2 {
+    if v == 2 || v == 3 {
         return true;
     }
 
-    if v < 2 || v % 2 == 0 {
+    if v < 2 || v % 2 == 0 || v % 3 == 0 {
         return false;
     }
 
-    let mut i = 3;
+    let mut i = 5;
     while i * i <= v {
-        if v % i == 0 {
+        if v % i == 0 || v % (i + 2) == 0 {
             return false;
         }
 
-        i += 2;
+        i += 6;
     }
 
     true
@@ -91,16 +91,30 @@ mod tests {
 
     #[test]
     fn is_prime_test() {
-        assert_eq!(is_prime(0), false);
-        assert_eq!(is_prime(1), false);
-        assert_eq!(is_prime(2), true);
-        assert_eq!(is_prime(3), true);
-        assert_eq!(is_prime(4), false);
-        assert_eq!(is_prime(5), true);
-        assert_eq!(is_prime(6), false);
-        assert_eq!(is_prime(7), true);
-        assert_eq!(is_prime(8), false);
-        assert_eq!(is_prime(9), false);
+        fn naive(v: i64) -> bool {
+            if v == 2 {
+                return true;
+            }
+
+            if v < 2 || v % 2 == 0 {
+                return false;
+            }
+
+            let mut i = 3;
+            while i * i <= v {
+                if v % i == 0 {
+                    return false;
+                }
+
+                i += 2;
+            }
+
+            true
+        }
+
+        for i in 0..10000 {
+            assert_eq!(is_prime(i), naive(i));
+        }
     }
 
     #[test]
