@@ -84,6 +84,21 @@ pub fn ext_gcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
     }
 }
 
+pub fn bin_coef(n: usize) -> Vec<Vec<i64>> {
+    let mut result = vec![vec![0i64; n + 1]; n + 1];
+    for i in 0..=n {
+        for j in 0..=i {
+            result[i][j] = if j == 0 || j == i {
+                1
+            } else {
+                result[i - 1][j - 1] + result[i - 1][j]
+            }
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,6 +118,23 @@ mod tests {
             for b in 0..=100 {
                 let (g, x, y) = ext_gcd(a, b);
                 assert_eq!((a * x) + (b * y), g);
+            }
+        }
+    }
+
+    #[test]
+    fn bin_coef_test() {
+        let n = 10;
+        let coef = bin_coef(n);
+        let mut frac = vec![1; n + 1];
+        for i in 1..=n {
+            frac[i] = i as i64 * frac[i - 1];
+        }
+
+        for i in 0..=10 {
+            for j in 0..=i {
+                let comb = frac[i] / (frac[j] * frac[i - j]);
+                assert_eq!(comb, coef[i][j]);
             }
         }
     }
