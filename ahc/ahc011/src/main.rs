@@ -23,8 +23,8 @@ pub fn main() {
     }
 
     const TIME_LIMIT: u64 = 2950;
-    let start_temp: f64 = (n - 1) as f64;
-    let end_temp: f64 = (n * n - 1) as f64;
+    let start_temp: f64 = n as f64;
+    let end_temp: f64 = (n * n) as f64;
 
     let simulator = AnnealingSimulator::new(TIME_LIMIT, start_temp, end_temp);
     let input = Input::new(n, t, tiles);
@@ -100,16 +100,14 @@ impl<'a> AnnealingState for State<'a> {
         for ch in 0..n {
             for cw in 0..n {
                 let u = ch * n + cw;
-                if self.tiles[ch][cw] != 0 && tree[dsu.leader_of(u)] {
-                    trees.push(dsu.size_of(u));
+                let size = dsu.size_of(u);
+                if self.tiles[ch][cw] != 0 && tree[dsu.leader_of(u)] && size > 1 {
+                    trees.push(size);
                 }
             }
         }
 
-        trees.sort();
-        trees.reverse();
-        // println!("{}", trees.iter().take(n).join(" "));
-        trees.into_iter().take(n).fold(0.0, |acc, x| acc + x as f64)
+        trees.into_iter().fold(0.0, |acc, x| acc + x as f64)
     }
 
     fn arrange(&self, rng: &mut StdRng) -> Self {
