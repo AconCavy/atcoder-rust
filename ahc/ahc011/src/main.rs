@@ -22,17 +22,497 @@ pub fn main() {
         tiles: [Bytes; n],
     }
 
-    const TIME_LIMIT: u64 = 2950;
-    let start_temp: f64 = n as f64;
-    let end_temp: f64 = (n * n) as f64;
+    let mut input = Input::new(n, t, tiles);
 
-    let simulator = AnnealingSimulator::new(TIME_LIMIT, start_temp, end_temp);
-    let input = Input::new(n, t, tiles);
-    let output = Output::new();
-    let state = State::new(&input, output, input.tiles.clone());
-    let result = simulator.simulate(state, 0);
+    let mut result = Vec::new();
+    let mut pos_0 = search_pos_0(n, &input.tiles);
+    let mut used = vec![vec![0; n]; n];
 
-    println!("{}", result.output);
+    for k in 0..n - 1 {
+        for w1 in k..n {
+            let h1 = k;
+            let t1 = get_suitable_tile(n, &input.tiles, &used, (h1, w1));
+            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
+                let pos_to = if w1 + 1 < n {
+                    (h1, w1 + 1)
+                } else if h1 + 1 < n {
+                    (h1 + 1, w1)
+                } else {
+                    (h1, w1)
+                };
+
+                pos_0 = tile_navigate_to(
+                    n,
+                    &mut input.tiles,
+                    &mut used,
+                    pos_0,
+                    (h2, w2),
+                    pos_to,
+                    &mut result,
+                );
+                used[pos_to.0][pos_to.1] = 1;
+            }
+        }
+
+        while pos_0.1 > k {
+            pos_0 = move_left(n, &mut input.tiles, pos_0, &mut result);
+        }
+        while pos_0.0 > k {
+            pos_0 = move_up(n, &mut input.tiles, pos_0, &mut result);
+        }
+        while pos_0.1 + 1 < n {
+            pos_0 = move_right(n, &mut input.tiles, pos_0, &mut result);
+        }
+        pos_0 = move_down(n, &mut input.tiles, pos_0, &mut result);
+
+        for h in 0..n {
+            for w in 0..n {
+                used[h][w] = 1;
+            }
+        }
+
+        for h in k + 1..n {
+            for w in k..n {
+                used[h][w] = 0;
+            }
+        }
+
+        for h1 in k + 1..n {
+            let w1 = k;
+            let t1 = get_suitable_tile(n, &input.tiles, &used, (h1, w1));
+            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
+                let pos_to = if h1 + 1 < n {
+                    (h1 + 1, w1)
+                } else if w1 + 1 < n {
+                    (h1, w1 + 1)
+                } else {
+                    (h1, w1)
+                };
+
+                pos_0 = tile_navigate_to(
+                    n,
+                    &mut input.tiles,
+                    &mut used,
+                    pos_0,
+                    (h2, w2),
+                    pos_to,
+                    &mut result,
+                );
+                used[pos_to.0][pos_to.1] = 1;
+            }
+        }
+
+        while pos_0.0 > k + 1 {
+            pos_0 = move_up(n, &mut input.tiles, pos_0, &mut result);
+        }
+        while pos_0.1 > k {
+            pos_0 = move_left(n, &mut input.tiles, pos_0, &mut result);
+        }
+        while pos_0.0 + 1 < n {
+            pos_0 = move_down(n, &mut input.tiles, pos_0, &mut result);
+        }
+        pos_0 = move_right(n, &mut input.tiles, pos_0, &mut result);
+
+        for h in 0..n {
+            for w in 0..n {
+                used[h][w] = 1;
+            }
+        }
+
+        for h in k + 1..n {
+            for w in k + 1..n {
+                used[h][w] = 0;
+            }
+        }
+    }
+
+    println!("{}", result.iter().take(t).join(""));
+}
+
+fn get_suitable_tile(n: usize, tiles: &[Vec<u8>], _used: &[Vec<i32>], pos: (usize, usize)) -> u8 {
+    let mut result = 0;
+    if pos.0 > 0 && tiles[pos.0 - 1][pos.1] & 8 != 0 {
+        result |= 2;
+    }
+    if pos.1 > 0 && tiles[pos.0][pos.1 - 1] & 4 != 0 {
+        result |= 1;
+    }
+
+    if pos.0 < n - 1 {
+        result |= 8;
+    } else if tiles[pos.0 - 1][pos.1] & 8 != 0 {
+        result |= 2;
+    }
+
+    if pos.1 < n - 1 {
+        result |= 4;
+    } else if tiles[pos.0][pos.1 - 1] & 4 != 0 {
+        result |= 1;
+    }
+
+    result
+}
+
+fn search_pos_0(n: usize, tiles: &[Vec<u8>]) -> (usize, usize) {
+    for i in 0..n {
+        for j in 0..n {
+            if tiles[i][j] == 0 {
+                return (i, j);
+            }
+        }
+    }
+
+    (0, 0)
+}
+
+fn cycle_dsu(n: usize, tiles: &[Vec<u8>], used: &[Vec<i32>]) -> Dsu {
+    let mut dsu = Dsu::new(n * n);
+    for h1 in 0..n {
+        for w1 in 0..n {
+            if used[h1][w1] > 0 {
+                let h2 = h1 + 1;
+                let w2 = w1;
+
+                if h2 < n && tiles[h1][w1] & 8 != 0 && tiles[h2][w2] & 2 != 0 {
+                    dsu.merge(h1 * n + w1, h2 * n + w2);
+                }
+
+                let h2 = h1;
+                let w2 = w1 + 1;
+                if w2 < n && tiles[h1][w1] & 4 != 0 && tiles[h2][w2] & 1 != 0 {
+                    dsu.merge(h1 * n + w1, h2 * n + w2);
+                }
+            }
+        }
+    }
+
+    dsu
+}
+
+fn check_pos(
+    n: usize,
+    tiles: &[Vec<u8>],
+    used: &[Vec<i32>],
+    pos_from: (usize, usize),
+    pos_to: (usize, usize),
+) -> (bool, usize) {
+    let mut dsu = cycle_dsu(n, tiles, used);
+    let mut neighbour = Vec::new();
+    if tiles[pos_from.0][pos_from.1] & 1 != 0
+        && pos_to.1 > 0
+        && tiles[pos_to.0][pos_to.1 - 1] & 4 != 0
+    {
+        neighbour.push(pos_to.0 * n + (pos_to.1 - 1));
+    }
+    if tiles[pos_from.0][pos_from.1] & 2 != 0
+        && pos_to.0 > 0
+        && tiles[pos_to.0 - 1][pos_to.1] & 8 != 0
+    {
+        neighbour.push((pos_to.0 - 1) * n + pos_to.1);
+    }
+    if tiles[pos_from.0][pos_from.1] & 4 != 0
+        && pos_to.1 + 1 < n
+        && tiles[pos_to.0][pos_to.1 + 1] & 1 != 0
+    {
+        neighbour.push(pos_to.0 * n + (pos_to.1 + 1));
+    }
+    if tiles[pos_from.0][pos_from.1] & 8 != 0
+        && pos_to.0 + 1 < n
+        && tiles[pos_to.0 + 1][pos_to.1] & 2 != 0
+    {
+        neighbour.push((pos_to.0 + 1) * n + pos_to.1);
+    }
+
+    let mut result = true;
+    for i in 0..neighbour.len() {
+        for j in i + 1..neighbour.len() {
+            let u = dsu.leader_of(neighbour[i]);
+            let v = dsu.leader_of(neighbour[j]);
+            result &= u != v;
+            dsu.merge(u, v);
+        }
+    }
+
+    let max_tree = dsu.groups().iter().fold(0, |acc, x| max(acc, x.len()));
+    (result, max_tree)
+}
+
+fn search_pos(
+    n: usize,
+    tiles: &[Vec<u8>],
+    used: &[Vec<i32>],
+    pos: (usize, usize),
+    t: u8,
+) -> Option<(usize, usize)> {
+    let mut list = Vec::new();
+    for h in 0..n {
+        for w in 0..n {
+            if used[h][w] == 0 && tiles[h][w] & t == t {
+                let (ok, size) = check_pos(n, tiles, used, (h, w), pos);
+                if ok {
+                    list.push(((h, w), size));
+                }
+            }
+        }
+    }
+
+    for h in 0..n {
+        for w in 0..n {
+            if used[h][w] == 0 && tiles[h][w] & t != 0 {
+                let (ok, size) = check_pos(n, tiles, used, (h, w), pos);
+                if ok {
+                    list.push(((h, w), size));
+                }
+            }
+        }
+    }
+
+    if !list.is_empty() {
+        list.sort_by_key(|x| x.1);
+        list.reverse();
+        let (pos, _) = list[0];
+        Some(pos)
+    } else {
+        None
+    }
+}
+
+fn swap_tile(tiles: &mut [Vec<u8>], pos_1: (usize, usize), pos_2: (usize, usize)) {
+    let tmp = tiles[pos_1.0][pos_1.1];
+    tiles[pos_1.0][pos_1.1] = tiles[pos_2.0][pos_2.1];
+    tiles[pos_2.0][pos_2.1] = tmp;
+}
+
+fn calc_prev(n: usize, used: &[Vec<i32>], pos: (usize, usize)) -> Vec<Vec<(usize, usize)>> {
+    let mut prev = vec![vec![(n, n); n]; n];
+    let mut visit = vec![vec![false; n]; n];
+    let mut queue = VecDeque::new();
+    queue.push_back(pos);
+    visit[pos.0][pos.1] = true;
+    let delta = DeltaIndex::new((n, n), &[(0, -1), (-1, 0), (0, 1), (1, 0)]);
+    while let Some(curr) = queue.pop_front() {
+        for next in delta.generate(curr) {
+            if used[next.0][next.1] == 0 && !visit[next.0][next.1] {
+                visit[next.0][next.1] = true;
+                prev[next.0][next.1] = curr;
+                queue.push_back(next);
+            }
+        }
+    }
+
+    prev
+}
+
+fn move_left(
+    _n: usize,
+    tiles: &mut [Vec<u8>],
+    pos: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> (usize, usize) {
+    if pos.1 > 0 {
+        swap_tile(tiles, (pos.0, pos.1), (pos.0, pos.1 - 1));
+        result.push(Direction::Left);
+        (pos.0, pos.1 - 1)
+    } else {
+        pos
+    }
+}
+
+fn move_up(
+    _n: usize,
+    tiles: &mut [Vec<u8>],
+    pos: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> (usize, usize) {
+    if pos.0 > 0 {
+        swap_tile(tiles, (pos.0, pos.1), (pos.0 - 1, pos.1));
+        result.push(Direction::Up);
+        (pos.0 - 1, pos.1)
+    } else {
+        pos
+    }
+}
+
+fn move_right(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    pos: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> (usize, usize) {
+    if pos.1 + 1 < n {
+        swap_tile(tiles, (pos.0, pos.1), (pos.0, pos.1 + 1));
+        result.push(Direction::Right);
+        (pos.0, pos.1 + 1)
+    } else {
+        pos
+    }
+}
+
+fn move_down(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    pos: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> (usize, usize) {
+    if pos.0 + 1 < n {
+        swap_tile(tiles, (pos.0, pos.1), (pos.0 + 1, pos.1));
+        result.push(Direction::Down);
+        (pos.0 + 1, pos.1)
+    } else {
+        pos
+    }
+}
+
+fn apply_route(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    pos_to: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> ((usize, usize), (usize, usize)) {
+    used[pos_from.0][pos_from.1] += 1;
+    let prev = calc_prev(n, used, pos_0);
+    used[pos_from.0][pos_from.1] -= 1;
+
+    let mut route = Vec::new();
+    route.push(dir_from_pos(pos_to, pos_from));
+    if pos_to.0 == n {
+        return (pos_0, pos_to);
+    }
+
+    let mut curr = pos_to;
+    while curr.0 != n {
+        route.push(dir_from_pos(prev[curr.0][curr.1], curr));
+        curr = prev[curr.0][curr.1];
+    }
+    route.reverse();
+
+    let mut pos_0 = pos_0;
+    for dir in route {
+        match dir {
+            Direction::None => {}
+            Direction::Left => {
+                pos_0 = move_left(n, tiles, pos_0, result);
+            }
+            Direction::Up => {
+                pos_0 = move_up(n, tiles, pos_0, result);
+            }
+            Direction::Right => {
+                pos_0 = move_right(n, tiles, pos_0, result);
+            }
+            Direction::Down => {
+                pos_0 = move_down(n, tiles, pos_0, result);
+            }
+        }
+    }
+
+    (pos_0, pos_to)
+}
+
+fn tile_move_left(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> ((usize, usize), (usize, usize)) {
+    if pos_from.1 > 0 {
+        let pos_to = (pos_from.0, pos_from.1 - 1);
+        apply_route(n, tiles, used, pos_0, pos_from, pos_to, result)
+    } else {
+        (pos_0, pos_from)
+    }
+}
+
+fn tile_move_up(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> ((usize, usize), (usize, usize)) {
+    if pos_from.0 > 0 {
+        let pos_to = (pos_from.0 - 1, pos_from.1);
+        apply_route(n, tiles, used, pos_0, pos_from, pos_to, result)
+    } else {
+        (pos_0, pos_from)
+    }
+}
+
+fn tile_move_right(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> ((usize, usize), (usize, usize)) {
+    if pos_from.1 < n {
+        let pos_to = (pos_from.0, pos_from.1 + 1);
+        apply_route(n, tiles, used, pos_0, pos_from, pos_to, result)
+    } else {
+        (pos_0, pos_from)
+    }
+}
+
+fn tile_move_down(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> ((usize, usize), (usize, usize)) {
+    if pos_from.0 < n {
+        let pos_to = (pos_from.0 + 1, pos_from.1);
+        apply_route(n, tiles, used, pos_0, pos_from, pos_to, result)
+    } else {
+        (pos_0, pos_from)
+    }
+}
+
+fn tile_navigate_to(
+    n: usize,
+    tiles: &mut [Vec<u8>],
+    used: &mut [Vec<i32>],
+    pos_0: (usize, usize),
+    pos_from: (usize, usize),
+    pos_to: (usize, usize),
+    result: &mut Vec<Direction>,
+) -> (usize, usize) {
+    let prev = calc_prev(n, used, pos_from);
+    let mut route = Vec::new();
+    let mut curr = pos_to;
+    while curr.0 != n {
+        route.push(dir_from_pos(prev[curr.0][curr.1], curr));
+        curr = prev[curr.0][curr.1];
+    }
+    route.reverse();
+
+    let mut pos = (pos_0, pos_from);
+    for dir in route {
+        match dir {
+            Direction::None => {}
+            Direction::Left => {
+                pos = tile_move_left(n, tiles, used, pos.0, pos.1, result);
+            }
+            Direction::Up => {
+                pos = tile_move_up(n, tiles, used, pos.0, pos.1, result);
+            }
+            Direction::Right => {
+                pos = tile_move_right(n, tiles, used, pos.0, pos.1, result);
+            }
+            Direction::Down => {
+                pos = tile_move_down(n, tiles, used, pos.0, pos.1, result);
+            }
+        }
+    }
+
+    pos.0
 }
 
 pub fn pos_from_dir(origin: (usize, usize), dir: Direction) -> (usize, usize) {
@@ -78,9 +558,8 @@ impl<'a> AnnealingState for State<'a> {
                     if a == b {
                         tree[a] = false;
                     } else {
-                        let t = tree[a] && tree[b];
                         dsu.merge(a, b);
-                        tree[dsu.leader_of(a)] = t;
+                        tree[dsu.leader_of(a)] = tree[a] && tree[b];
                     }
                 }
                 if cw + 1 < n && self.tiles[ch][cw] & 4 != 0 && self.tiles[ch][cw + 1] & 1 != 0 {
@@ -89,25 +568,24 @@ impl<'a> AnnealingState for State<'a> {
                     if a == b {
                         tree[a] = false;
                     } else {
-                        let t = tree[a] && tree[b];
                         dsu.merge(a, b);
-                        tree[dsu.leader_of(a)] = t;
+                        tree[dsu.leader_of(a)] = tree[a] && tree[b];
                     }
                 }
             }
         }
-        let mut trees = Vec::with_capacity(n * n);
+
+        let mut max_tree = 0;
         for ch in 0..n {
             for cw in 0..n {
                 let u = ch * n + cw;
-                let size = dsu.size_of(u);
-                if self.tiles[ch][cw] != 0 && tree[dsu.leader_of(u)] && size > 1 {
-                    trees.push(size);
+                if self.tiles[ch][cw] != 0 && tree[dsu.leader_of(u)] {
+                    max_tree = max(max_tree, dsu.size_of(u));
                 }
             }
         }
 
-        trees.into_iter().fold(0.0, |acc, x| acc + x as f64)
+        max_tree as f64
     }
 
     fn arrange(&self, rng: &mut StdRng) -> Self {
@@ -144,13 +622,7 @@ impl<'a> AnnealingState for State<'a> {
     }
 
     fn is_valid(&self) -> bool {
-        let len = self.output.directions.len();
-        let mut ok = len <= self.input.t;
-        ok &= !(len >= 4
-            && self.output.directions[len - 1] == self.output.directions[len - 3]
-            && self.output.directions[len - 2] == self.output.directions[len - 4]
-            && self.output.directions[len - 1] != self.output.directions[len - 2]);
-        ok
+        self.output.directions.len() <= self.input.t
     }
 }
 
@@ -203,20 +675,20 @@ impl Display for Output {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Direction {
     None,
-    L,
-    U,
-    R,
-    D,
+    Left,
+    Up,
+    Right,
+    Down,
 }
 
 impl Into<char> for Direction {
     fn into(self) -> char {
         match self {
             Direction::None => '.',
-            Direction::L => 'L',
-            Direction::U => 'U',
-            Direction::R => 'R',
-            Direction::D => 'D',
+            Direction::Left => 'L',
+            Direction::Up => 'U',
+            Direction::Right => 'R',
+            Direction::Down => 'D',
         }
     }
 }
@@ -225,10 +697,10 @@ impl Into<(i32, i32)> for Direction {
     fn into(self) -> (i32, i32) {
         match self {
             Direction::None => (0, 0),
-            Direction::L => (0, -1),
-            Direction::U => (-1, 0),
-            Direction::R => (0, 1),
-            Direction::D => (1, 0),
+            Direction::Left => (0, -1),
+            Direction::Up => (-1, 0),
+            Direction::Right => (0, 1),
+            Direction::Down => (1, 0),
         }
     }
 }
@@ -238,10 +710,10 @@ impl From<(i32, i32)> for Direction {
         let h = h.min(1).max(-1);
         let w = w.min(1).max(-1);
         match (h, w) {
-            (0, -1) => Direction::L,
-            (-1, 0) => Direction::U,
-            (0, 1) => Direction::R,
-            (1, 0) => Direction::D,
+            (0, -1) => Direction::Left,
+            (-1, 0) => Direction::Up,
+            (0, 1) => Direction::Right,
+            (1, 0) => Direction::Down,
             _ => Direction::None,
         }
     }
