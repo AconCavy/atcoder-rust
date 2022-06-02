@@ -27,13 +27,22 @@ pub fn main() {
     let mut result = Vec::new();
     let mut pos_0 = search_pos_0(n, &input.tiles);
     let mut used = vec![vec![0; n]; n];
+    let mut tiles_decided = vec![vec![0; n]; n];
 
     for k in 0..n - 1 {
-        for w1 in (k..n - 1).rev() {
+        for w1 in (k..n - 1).rev().merge(vec![n - 1]) {
             let h1 = k;
-            let t1 = get_suitable_tile(n, &input.tiles, &used, (h1, w1));
-            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
-                let pos_to = (h1, w1 + 1);
+            let t1 = get_suitable_tile(n, &tiles_decided, (h1, w1));
+            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, &tiles_decided, (h1, w1), t1)
+            {
+                let t2 = input.tiles[h2][w2];
+                let pos_to = if w1 + 1 < n {
+                    (h1, w1 + 1)
+                } else if h1 + 1 < n {
+                    (h1 + 1, w1)
+                } else {
+                    (h1, w1)
+                };
                 pos_0 = tile_navigate_to(
                     n,
                     &mut input.tiles,
@@ -44,25 +53,7 @@ pub fn main() {
                     &mut result,
                 );
                 used[pos_to.0][pos_to.1] = 1;
-            }
-        }
-
-        {
-            let h1 = k;
-            let w1 = n - 1;
-            let t1 = get_suitable_tile(n, &input.tiles, &used, (h1, n));
-            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
-                let pos_to = (h1 + 1, w1);
-                pos_0 = tile_navigate_to(
-                    n,
-                    &mut input.tiles,
-                    &mut used,
-                    pos_0,
-                    (h2, w2),
-                    pos_to,
-                    &mut result,
-                );
-                used[pos_to.0][pos_to.1] = 1;
+                tiles_decided[h1][w1] = t2;
             }
         }
 
@@ -89,11 +80,19 @@ pub fn main() {
             }
         }
 
-        for h1 in (k + 1..n).rev() {
+        for h1 in (k + 1..n - 1).rev().merge(vec![n - 1]) {
             let w1 = k;
-            let t1 = get_suitable_tile(n, &input.tiles, &used, (h1, w1));
-            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
-                let pos_to = if h1 + 1 < n { (h1 + 1, w1) } else { (h1, w1) };
+            let t1 = get_suitable_tile(n, &tiles_decided, (h1, w1));
+            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, &tiles_decided, (h1, w1), t1)
+            {
+                let t2 = input.tiles[h2][w2];
+                let pos_to = if h1 + 1 < n {
+                    (h1 + 1, w1)
+                } else if w1 + 1 < n {
+                    (h1, w1 + 1)
+                } else {
+                    (h1, w1)
+                };
                 pos_0 = tile_navigate_to(
                     n,
                     &mut input.tiles,
@@ -104,25 +103,7 @@ pub fn main() {
                     &mut result,
                 );
                 used[pos_to.0][pos_to.1] = 1;
-            }
-        }
-
-        {
-            let h1 = n - 1;
-            let w1 = k;
-            let t1 = get_suitable_tile(n, &input.tiles, &used, (n, w1));
-            if let Some((h2, w2)) = search_pos(n, &input.tiles, &used, (h1, w1), t1) {
-                let pos_to = (h1, w1 + 1);
-                pos_0 = tile_navigate_to(
-                    n,
-                    &mut input.tiles,
-                    &mut used,
-                    pos_0,
-                    (h2, w2),
-                    pos_to,
-                    &mut result,
-                );
-                used[pos_to.0][pos_to.1] = 1;
+                tiles_decided[h1][w1] = t2;
             }
         }
 
@@ -153,55 +134,21 @@ pub fn main() {
     println!("{}", result.iter().take(t).join(""));
 }
 
-fn get_suitable_tile(n: usize, tiles: &[Vec<u8>], used: &[Vec<i32>], pos: (usize, usize)) -> u8 {
+fn get_suitable_tile(n: usize, tiles_decided: &[Vec<u8>], pos: (usize, usize)) -> u8 {
     let mut result = 0;
-    if pos.0 > 0 && pos.1 < n && used[pos.0 - 1][pos.1] > 0 && tiles[pos.0 - 1][pos.1] & 8 != 0 {
+    if pos.0 > 0 && tiles_decided[pos.0 - 1][pos.1] & 8 != 0 {
         result |= 2;
     }
 
-    if pos.0 > 0
-        && pos.1 == n
-        && used[pos.0 - 1][pos.1 - 1] > 0
-        && tiles[pos.0 - 1][pos.1 - 1] & 8 != 0
-    {
-        result |= 2;
-    }
-
-    if pos.0 < n && pos.1 > 0 && used[pos.0][pos.1 - 1] > 0 && tiles[pos.0][pos.1 - 1] & 4 != 0 {
+    if pos.1 > 0 && tiles_decided[pos.0][pos.1 - 1] & 4 != 0 {
         result |= 1;
     }
 
-    if pos.0 == n
-        && pos.1 > 0
-        && used[pos.0 - 1][pos.1 - 1] > 0
-        && tiles[pos.0 - 1][pos.1 - 1] & 4 != 0
-    {
-        result |= 1;
-    }
-
-    if pos.0 + 1 < n && pos.1 < n && used[pos.0 + 1][pos.1] > 0 && tiles[pos.0 + 1][pos.1] & 2 != 0
-    {
+    if pos.0 + 1 < n && tiles_decided[pos.0 + 1][pos.1] & 2 != 0 {
         result |= 8;
     }
 
-    if pos.0 + 1 < n
-        && pos.1 == n
-        && used[pos.0 + 1][pos.1 - 1] > 0
-        && tiles[pos.0 + 1][pos.1 - 1] & 2 != 0
-    {
-        result |= 8;
-    }
-
-    if pos.0 < n && pos.1 + 1 < n && used[pos.0][pos.1 + 1] > 0 && tiles[pos.0][pos.1 + 1] & 1 != 0
-    {
-        result |= 4;
-    }
-
-    if pos.0 == n
-        && pos.1 + 1 < n
-        && used[pos.0 - 1][pos.1 + 1] > 0
-        && tiles[pos.0 - 1][pos.1 + 1] & 1 != 0
-    {
+    if pos.1 + 1 < n && tiles_decided[pos.0][pos.1 + 1] & 1 != 0 {
         result |= 4;
     }
 
@@ -237,23 +184,20 @@ fn search_pos_0(n: usize, tiles: &[Vec<u8>]) -> (usize, usize) {
     (0, 0)
 }
 
-fn cycle_dsu(n: usize, tiles: &[Vec<u8>], used: &[Vec<i32>]) -> Dsu {
+fn cycle_dsu(n: usize, tiles_decided: &[Vec<u8>]) -> Dsu {
     let mut dsu = Dsu::new(n * n);
     for h1 in 0..n {
         for w1 in 0..n {
-            if used[h1][w1] > 0 {
-                let h2 = h1 + 1;
-                let w2 = w1;
+            let h2 = h1 + 1;
+            let w2 = w1;
+            if h2 < n && tiles_decided[h1][w1] & 8 != 0 && tiles_decided[h2][w2] & 2 != 0 {
+                dsu.merge(h1 * n + w1, h2 * n + w2);
+            }
 
-                if h2 < n && tiles[h1][w1] & 8 != 0 && tiles[h2][w2] & 2 != 0 {
-                    dsu.merge(h1 * n + w1, h2 * n + w2);
-                }
-
-                let h2 = h1;
-                let w2 = w1 + 1;
-                if w2 < n && tiles[h1][w1] & 4 != 0 && tiles[h2][w2] & 1 != 0 {
-                    dsu.merge(h1 * n + w1, h2 * n + w2);
-                }
+            let h2 = h1;
+            let w2 = w1 + 1;
+            if w2 < n && tiles_decided[h1][w1] & 4 != 0 && tiles_decided[h2][w2] & 1 != 0 {
+                dsu.merge(h1 * n + w1, h2 * n + w2);
             }
         }
     }
@@ -264,34 +208,34 @@ fn cycle_dsu(n: usize, tiles: &[Vec<u8>], used: &[Vec<i32>]) -> Dsu {
 fn check_pos(
     n: usize,
     tiles: &[Vec<u8>],
-    used: &[Vec<i32>],
+    tiles_decided: &[Vec<u8>],
     pos_from: (usize, usize),
     pos_to: (usize, usize),
 ) -> (bool, usize) {
     let mut result = true;
-    let mut dsu = cycle_dsu(n, tiles, used);
+    let mut dsu = cycle_dsu(n, tiles_decided);
     let mut neighbour = Vec::new();
     if tiles[pos_from.0][pos_from.1] & 1 != 0
         && pos_to.1 > 0
-        && tiles[pos_to.0][pos_to.1 - 1] & 4 != 0
+        && tiles_decided[pos_to.0][pos_to.1 - 1] & 4 != 0
     {
         neighbour.push(pos_to.0 * n + (pos_to.1 - 1));
     }
     if tiles[pos_from.0][pos_from.1] & 2 != 0
         && pos_to.0 > 0
-        && tiles[pos_to.0 - 1][pos_to.1] & 8 != 0
+        && tiles_decided[pos_to.0 - 1][pos_to.1] & 8 != 0
     {
         neighbour.push((pos_to.0 - 1) * n + pos_to.1);
     }
     if tiles[pos_from.0][pos_from.1] & 4 != 0
         && pos_to.1 + 1 < n
-        && tiles[pos_to.0][pos_to.1 + 1] & 1 != 0
+        && tiles_decided[pos_to.0][pos_to.1 + 1] & 1 != 0
     {
         neighbour.push(pos_to.0 * n + (pos_to.1 + 1));
     }
     if tiles[pos_from.0][pos_from.1] & 8 != 0
         && pos_to.0 + 1 < n
-        && tiles[pos_to.0 + 1][pos_to.1] & 2 != 0
+        && tiles_decided[pos_to.0 + 1][pos_to.1] & 2 != 0
     {
         neighbour.push((pos_to.0 + 1) * n + pos_to.1);
     }
@@ -313,6 +257,7 @@ fn search_pos(
     n: usize,
     tiles: &[Vec<u8>],
     used: &[Vec<i32>],
+    tiles_decided: &[Vec<u8>],
     pos: (usize, usize),
     t: u8,
 ) -> Option<(usize, usize)> {
@@ -320,7 +265,7 @@ fn search_pos(
     for h in 0..n {
         for w in 0..n {
             if used[h][w] == 0 && tiles[h][w] & t == t {
-                let (ok, size) = check_pos(n, tiles, used, (h, w), pos);
+                let (ok, size) = check_pos(n, tiles, tiles_decided, (h, w), pos);
                 if ok {
                     list.push(((h, w), size));
                 }
@@ -338,7 +283,7 @@ fn search_pos(
     for h in 0..n {
         for w in 0..n {
             if used[h][w] == 0 && tiles[h][w] & t != 0 {
-                let (ok, size) = check_pos(n, tiles, used, (h, w), pos);
+                let (ok, size) = check_pos(n, tiles, tiles_decided, (h, w), pos);
                 if ok {
                     list.push(((h, w), size));
                 }
@@ -346,13 +291,13 @@ fn search_pos(
         }
     }
 
-    if !list.is_empty() {
+    if list.is_empty() {
+        None
+    } else {
         list.sort_by_key(|x| x.1);
         list.reverse();
         let (pos, _) = list[0];
         Some(pos)
-    } else {
-        None
     }
 }
 
