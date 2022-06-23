@@ -119,6 +119,20 @@ impl DivAssign for Mint {
     }
 }
 
+macro_rules! impl_from_integer_for_mint {
+    ($($t:ident),*) => {
+        $(
+            impl From<$t> for Mint {
+                fn from(v: $t) -> Self {
+                    Self::new(v as i64)
+                }
+            }
+        )*
+    };
+}
+
+impl_from_integer_for_mint!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+
 #[cfg(test)]
 mod tests {
     use super::*;
